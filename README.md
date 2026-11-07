@@ -2,12 +2,12 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão completa documentada aqui é a **1.5.0**, na branch [`codex/venda-pokemon`](https://github.com/AntonioF2/multipoke-autocaptura/tree/codex/venda-pokemon). A branch `main` reúne a autocaptura inicial e este guia.
+A versão atual é a **1.5.0**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome
 
 1. Entre no GitHub com uma conta que tenha acesso ao repositório privado.
-2. Abra a [branch com a versão completa](https://github.com/AntonioF2/multipoke-autocaptura/tree/codex/venda-pokemon) e clique em **Code → Download ZIP**. Extraia o arquivo para uma pasta de sua escolha.
+2. Abra a [branch principal](https://github.com/AntonioF2/multipoke-autocaptura/tree/main) e clique em **Code → Download ZIP**. Extraia o arquivo para uma pasta de sua escolha.
 3. No mesmo perfil do Chrome que você usa para jogar, abra `chrome://extensions` e ative o **Modo do desenvolvedor**.
 4. Clique em **Carregar sem compactação** e selecione a pasta extraída que contém o arquivo `manifest.json`.
 5. Confira se **MultiPoke Autocaptura** aparece na lista. Se quiser deixar o ícone à mão, abra o menu de extensões do Chrome e fixe a extensão na barra.
@@ -15,7 +15,7 @@ A versão completa documentada aqui é a **1.5.0**, na branch [`codex/venda-poke
 Se preferir clonar o repositório, use o comando abaixo e selecione a pasta clonada no passo 4.
 
 ```bash
-git clone --branch codex/venda-pokemon https://github.com/AntonioF2/multipoke-autocaptura.git
+git clone https://github.com/AntonioF2/multipoke-autocaptura.git
 ```
 
 [Guia do Chrome para carregar extensões locais](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked) · [Guia do GitHub para baixar um ZIP](https://docs.github.com/pt/repositories/working-with-files/using-files/downloading-source-code-archives)
@@ -78,7 +78,7 @@ A extensão vende até **10 Pokémon por ciclo**. Ela usa a lista de venda da lo
 
 ## Como atualizar
 
-1. Atualize os arquivos na pasta que o Chrome carrega. Se você clonou a branch da versão completa, execute `git pull --ff-only` dentro da pasta do projeto. Se usou ZIP, baixe e extraia a versão nova na pasta da extensão.
+1. Atualize os arquivos na pasta que o Chrome carrega. Se você clonou o repositório, abra a branch `main` com `git switch main` e execute `git pull --ff-only` dentro da pasta do projeto. Se usou ZIP, baixe e extraia a versão nova na pasta da extensão.
 2. Em `chrome://extensions`, clique em **Recarregar** no cartão **MultiPoke Autocaptura** e confira a versão.
 3. Atualize a aba do jogo e clique no ícone da extensão. Abra o Auto Loja e inicie as operações que deseja usar.
 
