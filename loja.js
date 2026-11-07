@@ -136,8 +136,10 @@
       #painel > summary:focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
       #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
       .loot { display: grid; max-height: 170px; overflow: auto; }
-      .loot label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px;
-        padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
+      .regra-loot { padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
+      .regra-loot label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+      .permitir-loot { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .permitir-loot input { min-height: 0; margin: 0; }
       .loot small { display: block; color: #445b7d; }
       #alternar, #alternar-captura { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
         border-radius: 7px; font-weight: 800; }
@@ -171,7 +173,7 @@
         <div><label>Venda automática <select id="modo-venda">
             <option value="">Desligada</option>
             <option value="marcados">Somente marcados para venda</option>
-            <option value="baratos">Loot barato, exceto protegidos</option>
+            <option value="baratos">Loot barato e itens marcados</option>
           </select></label>
           <details id="regras-loot" class="regras">
             <summary>Regras de loot</summary>
@@ -251,7 +253,7 @@
       if (!nome || !/^\d+$/.test(id)) continue;
       const preco = numero(texto(item, "p").match(/^Venda · ([\d.]+) Pokédollars$/)?.[1]);
       const vendavel = item.dataset.filterAvailable === "yes" && normalizar(nome) !== "ruby" &&
-        inteiro(preco, 1, LIMITE_LOOT);
+        inteiro(preco, 1, Number.MAX_SAFE_INTEGER);
       itens.set(chaveLoot(`id:${id}`, nome), { id, nome, preco, vendavel });
     }
     if (!itens.size) throw new Error("A Pokepédia não apresentou o catálogo de loot esperado.");
@@ -290,7 +292,7 @@
     try {
       const salvas = JSON.parse(localStorage.getItem(chaveRegras()));
       for (const [chave, regra] of Object.entries(salvas ?? {})) {
-        if (regra === "vender" || regra === "proteger") regrasLoot.set(chave, regra);
+        if (["vender", "vender-acima-do-limite", "proteger"].includes(regra)) regrasLoot.set(chave, regra);
       }
     } catch { /* As regras podem ser usadas nesta aba sem armazenamento. */ }
   }
@@ -357,8 +359,19 @@
     const partes = [`#${item.id}`];
     if (Number.isFinite(item.preco)) partes.push(`${formatar(item.preco)} por unidade`);
     if (estoque) partes.push(`${formatar(estoque)} na loja`);
-    if (!item.vendavel) partes.push("protegido pela regra de preço ou catálogo");
+    if (!item.vendavel) partes.push("indisponível para venda automática");
+    else if (item.preco > LIMITE_LOOT) partes.push("exige permissão explícita");
     rotulo.textContent = partes.join(" · ");
+  }
+
+  function lootPermitido(chave, modo, precoAtual) {
+    const item = catalogo?.get(chave);
+    if (!item?.vendavel) return false;
+    const regra = regrasLoot.get(chave);
+    if (regra === "vender-acima-do-limite") return true;
+    // As autorizações antigas continuam limitadas a loot barato.
+    const barato = item.preco <= LIMITE_LOOT && (precoAtual ?? item.preco) <= LIMITE_LOOT;
+    return barato && (regra === "vender" || (modo === "baratos" && regra !== "proteger"));
   }
 
   function mostrarCatalogo() {
@@ -369,30 +382,51 @@
       return;
     }
     const busca = normalizar(campo("buscar-loot").value.trim()).replace(/^#/, "");
+    const modo = campo("modo-venda").value;
     for (const [chave, item] of catalogo) {
       if (!normalizar(item.nome).includes(busca) && !item.id.includes(busca)) continue;
+      const linha = document.createElement("div");
+      linha.className = "regra-loot";
       const label = document.createElement("label");
       const nome = document.createElement("span");
       const rotulo = document.createElement("small");
       rotulo.dataset.estoqueLoot = chave;
       atualizarRotuloLoot(rotulo);
       nome.append(item.nome, rotulo);
-      const select = document.createElement("select");
-      select.setAttribute("aria-label", `Regra de ${item.nome} #${item.id}`);
-      select.add(new Option("Sem regra", ""));
-      if (item.vendavel) select.add(new Option("Vender", "vender"));
-      select.add(new Option("Proteger", "proteger"));
-      select.value = [...select.options].some(opcao => opcao.value === regrasLoot.get(chave))
-        ? regrasLoot.get(chave) : "";
-      select.addEventListener("change", () => {
-        if (treinador() !== treinadorConfigurado) return;
-        if (select.value) regrasLoot.set(chave, select.value);
-        else regrasLoot.delete(chave);
-        try { localStorage.setItem(chaveRegras(), JSON.stringify(Object.fromEntries(regrasLoot))); }
-        catch { /* Mantém as regras nesta aba. */ }
+      const controle = document.createElement("span");
+      controle.className = "permitir-loot";
+      const caixa = document.createElement("input");
+      caixa.type = "checkbox";
+      caixa.disabled = !item.vendavel;
+      caixa.setAttribute("aria-label", `Permitir venda de ${item.nome} #${item.id}`);
+      const padrao = document.createElement("button");
+      padrao.type = "button";
+      padrao.textContent = "Usar padrão";
+      padrao.setAttribute("aria-label", `Usar regra padrão para ${item.nome} #${item.id}`);
+      const atualizar = () => {
+        caixa.checked = lootPermitido(chave, modo);
+        padrao.hidden = !item.vendavel || !regrasLoot.has(chave);
+      };
+      const salvar = regra => {
+        if (item.vendavel && treinador() === treinadorConfigurado) {
+          if (regra) regrasLoot.set(chave, regra);
+          else regrasLoot.delete(chave);
+          try { localStorage.setItem(chaveRegras(), JSON.stringify(Object.fromEntries(regrasLoot))); }
+          catch { /* Mantém as regras nesta aba. */ }
+        }
+        atualizar();
+      };
+      const regraVenda = item.preco > LIMITE_LOOT ? "vender-acima-do-limite" : "vender";
+      caixa.addEventListener("change", () => salvar(caixa.checked ? regraVenda : "proteger"));
+      padrao.addEventListener("click", () => {
+        salvar("");
+        caixa.focus();
       });
-      label.append(nome, select);
-      lista.append(label);
+      atualizar();
+      controle.append(caixa, "Permitir venda");
+      label.append(nome, controle);
+      linha.append(label, padrao);
+      lista.append(linha);
     }
     if (!lista.childElementCount) lista.textContent = "Nenhum loot corresponde à busca.";
   }
@@ -522,11 +556,7 @@
 
   async function vender(modo) {
     abaLoja("loot");
-    const permitido = item => {
-      if (!item || !catalogo?.get(item.chave)?.vendavel || item.preco > LIMITE_LOOT) return false;
-      const regra = regrasLoot.get(item.chave);
-      return regra === "vender" || (modo === "baratos" && regra !== "proteger");
-    };
+    const permitido = item => item && lootPermitido(item.chave, modo, item.preco);
     const alvo = pilhas().filter(permitido);
     if (!alvo.length) return;
     if (caixasLoot().some(caixa => caixa.checked)) throw new Error("Há uma seleção manual de loot na loja. Limpe-a antes de retomar.");
@@ -777,8 +807,8 @@
         catch { controle.value = padrao; }
       }
       campo("vender-pokemon").checked = false;
-      if (catalogo) mostrarCatalogo();
       campo("modo-venda").value = "";
+      if (catalogo) mostrarCatalogo();
     }
     if (!catalogo && Date.now() >= proximaConsultaCatalogo) {
       void carregarCatalogo().catch(() => {}).finally(mostrarCatalogo);
@@ -801,6 +831,7 @@
   }
 
   campo("buscar-loot").addEventListener("input", mostrarCatalogo);
+  campo("modo-venda").addEventListener("change", mostrarCatalogo);
   campo("painel").addEventListener("toggle", atualizarEstoque);
   for (const id of camposCompra) {
     const controle = campo(id);
@@ -838,9 +869,9 @@
     })).filter(regra => regra.id);
     const modoVenda = campo("modo-venda").value;
     if (modoVenda && !catalogo) return informar("Aguarde o catálogo de loot.");
-    if (modoVenda === "marcados" && ![...regrasLoot].some(([chave, regra]) =>
-      regra === "vender" && catalogo.get(chave)?.vendavel,
-    )) return informar("Marque os itens de loot que quer vender.");
+    if (modoVenda === "marcados" && ![...regrasLoot.keys()].some(chave => lootPermitido(chave, modoVenda))) {
+      return informar("Marque os itens de loot que quer vender.");
+    }
     let filtroPokemon = null;
     if (campo("vender-pokemon").checked) {
       const entradaQualidade = campo("pokemon-qualidade").value.trim();

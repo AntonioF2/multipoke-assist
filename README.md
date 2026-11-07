@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.6**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.7**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome
 
@@ -49,15 +49,15 @@ Por exemplo, **Até 10** e **Comprar 50** repõem 50 unidades quando restarem 10
 
 ## Venda de loot
 
-Abra **Regras de loot** e use a busca por nome ou ID para encontrar itens da Pokepédia, inclusive os que ainda não estão na mochila. Selecione **Vender**, **Proteger** ou **Sem regra** para cada item.
+Abra **Regras de loot** e use a busca por nome ou ID para encontrar itens da Pokepédia, inclusive os que ainda não estão na mochila. Marque **Permitir venda** para autorizar um item ou desmarque para protegê-lo. O botão **Usar padrão** remove a escolha individual e volta a seguir o modo de venda.
 
 | Modo de venda automática | Comportamento |
 | --- | --- |
 | **Desligada** | Mantém a venda automática de loot pausada. |
 | **Somente marcados para venda** | Vende apenas o loot elegível marcado como **Vender**. |
-| **Loot barato, exceto protegidos** | Vende todo loot elegível, incluindo itens **Sem regra**, e preserva os marcados como **Proteger**. |
+| **Loot barato e itens marcados** | Marca por padrão o loot elegível de até **100 Pokédollars por unidade**. Itens mais caros exigem autorização individual. |
 
-Nos dois modos, o loot precisa constar no catálogo como elegível, aparecer na loja do jogo e valer até **100 Pokédollars por unidade**. Poké Bolas, poções e pedras de evolução ficam fora da lista de venda automática de loot.
+Nos dois modos, o loot precisa constar no catálogo como disponível para venda e aparecer na loja do jogo. Poké Bolas, poções e pedras de evolução ficam fora da lista de venda automática de loot.
 
 ## Venda de Pokémon
 
@@ -89,6 +89,7 @@ Se o painel não aparecer, confira se você carregou a versão completa, se a ab
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.7 | Regras de loot com a opção **Permitir venda** por item, padrões por modo e autorização individual para itens acima de 100 Pokédollars. |
 | 1.5.6 | Autocaptura e painel Auto Loja carregam automaticamente ao abrir ou recarregar a página do jogo. |
 | 1.5.5 | A Autocaptura pausa e retoma conforme o estoque da Poké Bola configurada, mesmo com a Auto Loja pausada. Se faltar saldo para comprar, a Auto Loja mantém as vendas e tenta a reposição quando houver saldo suficiente. |
 | 1.5.4 | Botão roxo no painel para ligar e desligar a autocaptura independentemente das compras e vendas. |
