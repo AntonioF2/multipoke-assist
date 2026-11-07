@@ -84,6 +84,7 @@
   const saldo = () => numero(texto(document, "#drawer.open [data-bag-balance] strong").match(/^\$\s*([\d.]+)$/)?.[1]);
   const treinador = () => texto(document, "#party-trainer-name");
   const cacada = () => texto(document, "#hunt-header-state") === "CAÇANDO";
+  const huntAtiva = () => Boolean(jogo('#hunt-header[aria-label="Hunt atual"]')) || cacada();
   const modal = () => jogo("dialog[open]");
 
   const painel = document.createElement("div");
@@ -113,8 +114,11 @@
         border: 1px solid var(--amarelo); border-radius: 8px; object-fit: contain; image-rendering: pixelated; }
       .titulo { display: block; color: var(--amarelo); font-size: 19px; font-weight: 900;
         text-shadow: 1px 2px var(--azul); white-space: nowrap; }
-      #estado { font-size: 12px; font-weight: 700; }
-      #estado:empty { display: none; }
+      #estado { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+      #estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%;
+        background: #5f0715; border: 1px solid #ffb4bf; }
+      #estado[data-ativa]::before { background: #54ff72; border-color: #ceffd5;
+        box-shadow: 0 0 7px #54ff72; }
       .regras { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
       .regras > summary { font-weight: 700; }
       #regras-pokemon label { margin: 3px 0; }
@@ -148,7 +152,7 @@
         <span id="arrastar" title="Segure e arraste para mover">
           <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
           <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48" draggable="false">
-          <span><span class="titulo">Auto Loja</span><span id="estado"></span></span>
+          <span><span class="titulo">Auto Loja</span><span id="estado" role="status">Offline</span></span>
         </span>
       </summary>
       <fieldset id="config">
@@ -530,6 +534,31 @@
     return { id, caixa, preco, faixa: selo[1] };
   }
 
+  function suspenderFiltrosPokemon(layout) {
+    const limparFiltros = layout.querySelector("[data-reset-sale-filters]");
+    if (!limparFiltros) return;
+
+    const campos = ["[data-sale-search]", "[data-sale-iv-min]", "[data-sale-iv-max]", "[data-sale-sort]"];
+    const valores = campos.map(seletor => [seletor, layout.querySelector(seletor)?.value]);
+    const excluidas = [...layout.querySelectorAll('[data-sale-quality][aria-pressed="false"]')]
+      .map(botao => botao.dataset.saleQuality);
+    limparFiltros.click();
+
+    return () => {
+      // Se o jogador já mudou os filtros, preserva as escolhas feitas por ele.
+      if (layout.querySelector("[data-reset-sale-filters]")) return;
+      for (const [seletor, valor] of valores) {
+        const campo = layout.querySelector(seletor);
+        if (!campo || valor === undefined || campo.value === valor) continue;
+        campo.value = valor;
+        campo.dispatchEvent(new Event(campo.matches("select") ? "change" : "input", { bubbles: true }));
+      }
+      for (const qualidade of excluidas) {
+        layout.querySelector(`[data-sale-quality="${CSS.escape(qualidade)}"][aria-pressed="true"]`)?.click();
+      }
+    };
+  }
+
   async function venderPokemon(filtro, continua) {
     const layout = loja();
     const abaAnterior = layout.dataset.mode === "tabs" ? layout.dataset.activeTab
@@ -543,11 +572,26 @@
     if (!rolagem?.clientHeight) return;
     const topo = rolagem.scrollTop;
     const lote = new Map();
+    const treinadorDaVenda = treinador();
+    const continuaVenda = () => continua() && huntAtiva() && loja() === layout && !modal();
+    let selecaoManual = false;
+    const registrarSelecaoManual = event => {
+      if (event.isTrusted && event.target.closest(".pokemon-sale-row .depot-check, [data-select-filtered-sale-pokemon], [data-clear-sale-selection]")) {
+        selecaoManual = true;
+      }
+    };
+    let restaurarFiltros;
+    layout.addEventListener("click", registrarSelecaoManual, true);
     try {
       if (limpar() || caixas().length) throw new Error("Há Pokémon selecionados manualmente na loja. Limpe a seleção antes de retomar.");
-      rolagem.scrollTop = 0;
-      while (continua() && loja() === layout && !modal()) {
-        for (const { id } of candidatos()) {
+      restaurarFiltros = suspenderFiltrosPokemon(layout);
+      // A ordem padrão da loja é do mais recente para o mais antigo.
+      if (rolagem.scrollHeight > rolagem.clientHeight) {
+        rolagem.scrollTop = rolagem.scrollHeight;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      while (continuaVenda()) {
+        for (const { id } of candidatos().reverse()) {
           if (lote.size === LIMITE_LOTE_POKEMON) break;
           if (lote.has(id)) continue;
           const linha = layout.querySelector(`.pokemon-sale-row[data-pokemon-id="${CSS.escape(id)}"]`);
@@ -556,14 +600,14 @@
           item.caixa.click();
           lote.set(id, item);
         }
-        if (lote.size === LIMITE_LOTE_POKEMON || rolagem.scrollTop + rolagem.clientHeight >= rolagem.scrollHeight - 1) break;
+        if (lote.size === LIMITE_LOTE_POKEMON || rolagem.scrollTop <= 0) break;
         const antes = rolagem.scrollTop;
-        rolagem.scrollTop += Math.max(1, Math.floor(rolagem.clientHeight * 0.8));
+        rolagem.scrollTop -= Math.max(1, Math.floor(rolagem.clientHeight * 0.8));
         if (rolagem.scrollTop === antes) break;
         // A lista do jogo só monta no DOM os cartões próximos à área visível.
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      if (!lote.size || !continua() || loja() !== layout || modal()) return;
+      if (!lote.size || !continuaVenda()) return;
 
       const marcadosVisiveis = candidatos().filter(item => item.caixa.checked);
       const quantidade = formatar(lote.size);
@@ -583,7 +627,7 @@
       const esperado = new Map([["Pokémon na venda", quantidade], ["Total", `$ ${formatar(preco)}`]]);
       for (const [faixa, quantidade] of faixas) esperado.set(faixa, formatar(quantidade));
       await comprovante(() => {
-        if (!continua() || modal()) return false;
+        if (!continuaVenda()) return false;
         const semDialogo = localStorage.getItem("multipoke-hide-sale-confirmation:pokemon") === "true";
         botao.click();
         const dialogo = modal();
@@ -597,17 +641,27 @@
       () => !limpar() && !caixas().length);
       return `${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
     } finally {
-      if (continua() && loja() === layout && !modal()) {
-        if (lote.size) limpar()?.click();
-        rolagem.scrollTop = topo;
-        if (abaAnterior) abaLoja(abaAnterior);
+      layout.removeEventListener("click", registrarSelecaoManual, true);
+      if (layout.isConnected && treinador() === treinadorDaVenda && !modal()) {
+        if (lote.size && !selecaoManual) limpar()?.click();
+        restaurarFiltros?.();
+        if (loja() === layout && continua()) {
+          rolagem.scrollTop = topo;
+          if (abaAnterior) abaLoja(abaAnterior);
+        }
       }
     }
   }
 
+  function atualizarIndicador() {
+    const ativo = Boolean(sessao);
+    campo("estado").toggleAttribute("data-ativa", ativo);
+    campo("estado").textContent = ativo ? "Ativa" : "Offline";
+  }
+
   function pausar(mensagem) {
     sessao = null;
-    campo("estado").textContent = "";
+    atualizarIndicador();
     campo("alternar").textContent = "Iniciar Auto Loja";
     campo("config").disabled = ocupada;
     informar(mensagem);
@@ -617,30 +671,33 @@
     const atual = sessao;
     if (!atual || ocupada || !document.hasFocus() || document.hidden) return;
     const inicio = interacoes;
-    const continua = () => sessao === atual && treinador() === atual.treinador && cacada() &&
+    const continua = () => sessao === atual && treinador() === atual.treinador &&
       inicio === interacoes && document.hasFocus() && !document.hidden && jogo("#game-shell:not([inert])");
     if (treinador() !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
-    const vendaDevida = (atual.modoVenda || atual.filtroPokemon) && Date.now() >= atual.proximaVenda;
-    if (!continua() || (!atual.compras.length && !vendaDevida)) return atualizarEstoque();
+    const vendaDevida = Date.now() >= atual.proximaVenda;
+    const compras = cacada() ? atual.compras : [];
+    const modoVenda = vendaDevida && cacada() && atual.modoVenda;
+    const filtroPokemon = vendaDevida && huntAtiva() && atual.filtroPokemon;
+    if (!continua() || (!compras.length && !modoVenda && !filtroPokemon)) return atualizarEstoque();
     ocupada = true;
     try {
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
         if (!lock || !continua()) return;
         await comLoja(false, async () => {
           const resultados = [];
-          for (const regra of atual.compras) {
-            if (!continua() || !loja() || modal()) return;
+          for (const regra of compras) {
+            if (!continua() || !cacada() || !loja() || modal()) return;
             const compra = await comprar(regra, atual.reserva);
             if (compra) resultados.push(compra);
           }
-          if (vendaDevida && continua() && loja() && !modal()) {
+          if ((modoVenda || filtroPokemon) && continua() && loja() && !modal()) {
             atual.proximaVenda = Date.now() + INTERVALO_VENDA;
-            if (atual.modoVenda) {
-              const venda = await vender(atual.modoVenda);
+            if (modoVenda && cacada()) {
+              const venda = await vender(modoVenda);
               if (venda) resultados.push(`Vendeu ${venda}`);
             }
-            if (atual.filtroPokemon && continua() && loja() && !modal()) {
-              const venda = await venderPokemon(atual.filtroPokemon, continua);
+            if (filtroPokemon && continua() && huntAtiva() && loja() && !modal()) {
+              const venda = await venderPokemon(filtroPokemon, continua);
               if (venda) resultados.push(`Vendeu ${venda}`);
             }
           }
@@ -759,7 +816,7 @@
     }
     sessao = { treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva, proximaVenda: 0 };
     campo("config").disabled = true;
-    campo("estado").textContent = "· ativa";
+    atualizarIndicador();
     campo("alternar").textContent = "Pausar Auto Loja";
     informar("Ativa durante a caçada. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
     void ciclo();
