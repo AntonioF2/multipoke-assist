@@ -6,8 +6,10 @@
     return;
   }
 
-  if (window.multiPokeCaptura) {
-    console.info("A autocaptura já está ativa nesta aba.");
+  const comando = "multipoke:autocaptura";
+  const raiz = document.documentElement;
+  if (raiz.hasAttribute("data-multipoke-autocaptura")) {
+    document.dispatchEvent(new CustomEvent(comando, { detail: "iniciar" }));
     return true;
   }
 
@@ -39,16 +41,32 @@
     }
   }
 
-  const intervalo = setInterval(clicarSeDisponivel, 350);
-  window.multiPokeCaptura = {
-    parar() {
-      clearInterval(intervalo);
-      delete window.multiPokeCaptura;
-      console.info("Autocaptura parada.");
-    },
-  };
+  let intervalo = null;
 
-  console.info("Autocaptura ativa. Para parar, execute multiPokeCaptura.parar().");
-  clicarSeDisponivel();
+  function parar() {
+    clearInterval(intervalo);
+    intervalo = null;
+    delete window.multiPokeCaptura;
+    raiz.dataset.multipokeAutocaptura = "pausada";
+    console.info("Autocaptura parada.");
+  }
+
+  function iniciar() {
+    if (intervalo !== null) return;
+    intervalo = setInterval(clicarSeDisponivel, 350);
+    window.multiPokeCaptura = { parar };
+    raiz.dataset.multipokeAutocaptura = "ativa";
+    console.info("Autocaptura ativa. Para parar, execute multiPokeCaptura.parar().");
+    clicarSeDisponivel();
+  }
+
+  document.addEventListener(comando, event => {
+    if (event.detail === "iniciar") iniciar();
+    if (event.detail === "alternar") {
+      if (intervalo === null) iniciar();
+      else parar();
+    }
+  });
+  iniciar();
   return true;
 })();

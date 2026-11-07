@@ -139,10 +139,14 @@
       .loot label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px;
         padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
       .loot small { display: block; color: #445b7d; }
-      #alternar { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
-        background: var(--amarelo); border: 1px solid var(--azul); border-radius: 7px;
-        color: var(--azul); font-weight: 800; }
+      #alternar, #alternar-captura { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
+        border-radius: 7px; font-weight: 800; }
+      #alternar { background: var(--amarelo); border: 1px solid var(--azul); color: var(--azul); }
       #alternar:hover { background: #ffda67; }
+      #alternar-captura { margin-top: 8px; background: #efe5ff; color: #461b72; border: 1px solid #6e37a8; }
+      #alternar-captura:hover { background: #e4d1ff; }
+      #alternar-captura[aria-pressed="true"] { background: #652bb0; color: white; }
+      #alternar-captura[aria-pressed="true"]:hover { background: #51208e; }
       #mensagem { margin: 8px 12px 12px; color: #445b7d; font-size: 12px; }
       p { margin: 8px 0; }
     </style>
@@ -188,12 +192,25 @@
         </details>
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
+      <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
       <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
     </details>`;
   document.body.append(painel);
 
   const campo = id => interfaceLoja.getElementById(id);
   configurarArraste(painel, campo("cabecalho"), campo("arrastar"));
+  const botaoCaptura = campo("alternar-captura");
+  const raiz = document.documentElement;
+  function atualizarBotaoCaptura() {
+    const ativa = raiz.dataset.multipokeAutocaptura === "ativa";
+    botaoCaptura.setAttribute("aria-pressed", String(ativa));
+    botaoCaptura.textContent = ativa ? "Autocaptura ligada" : "Autocaptura desligada";
+  }
+  botaoCaptura.addEventListener("click", () => {
+    document.dispatchEvent(new CustomEvent("multipoke:autocaptura", { detail: "alternar" }));
+  });
+  new MutationObserver(atualizarBotaoCaptura).observe(raiz, { attributeFilter: ["data-multipoke-autocaptura"] });
+  atualizarBotaoCaptura();
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
   const tiposCompra = ["bola", "pocao"];
   const camposCompra = [...tiposCompra, "bola-min", "bola-qtd", "pocao-min", "pocao-qtd", "reserva"];

@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.3**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.4**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome
 
@@ -34,7 +34,7 @@ Se houver várias abas do jogo, selecione a que você quer usar e clique no íco
 
 A extensão procura o botão **Capturar** nos painéis normal e de economia e aciona o clique quando o botão está visível e habilitado. O próprio jogo processa a tentativa com a Poké Bola selecionada nele.
 
-Para interromper só a captura, execute `multiPokeCaptura.parar()` no console da aba. Recarregar ou fechar a aba encerra a captura e o Auto Loja. Clique novamente no ícone da extensão para ativá-los na página nova.
+Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O ícone da extensão também liga a captura, e o comando `multiPokeCaptura.parar()` no console ainda pode desligá-la. Recarregar ou fechar a aba encerra a captura e o Auto Loja.
 
 ## Reposição de Poké Bolas e poções
 
@@ -88,6 +88,7 @@ Se o painel não aparecer, confira se você carregou a versão completa, se a ab
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.4 | Botão roxo no painel para ligar e desligar a autocaptura independentemente das compras e vendas. |
 | 1.5.3 | Venda pelo inventário do treinador em qualquer hunt ativa, com prioridade para capturas antigas e restauração dos filtros manuais da loja. Indicador verde quando a Auto Loja está ativa e vermelho-escuro quando está offline. |
 | 1.5.2 | Lotes de até 20 Pokémon, com seleção ao rolar pela lista da loja. |
 | 1.5.1 | Arraste pela faixa vermelha, seta exclusiva para abrir e recolher, reposição a cada 5 segundos e aviso de saldo insuficiente. |
