@@ -2,6 +2,69 @@
   if (location.origin !== "https://multipoke.io" || !/^\/jogar\/?$/.test(location.pathname)) return;
   if (document.getElementById("multipoke-auto-loja")) return;
 
+  function configurarArraste(painel, alca) {
+    const chave = "multipoke.auto-loja.posicao";
+    const margem = 12;
+    let posicao;
+    let arraste;
+
+    try {
+      const salva = JSON.parse(localStorage.getItem(chave));
+      if (Number.isFinite(salva?.x) && Number.isFinite(salva?.y)) posicao = salva;
+    } catch { /* O painel também funciona quando o armazenamento está indisponível. */ }
+
+    function limitar(x, y) {
+      return {
+        x: Math.max(margem, Math.min(x, innerWidth - painel.offsetWidth - margem)),
+        y: Math.max(margem, Math.min(y, innerHeight - painel.offsetHeight - margem)),
+      };
+    }
+
+    function posicionar() {
+      if (!posicao) return;
+      const { x, y } = limitar(posicao.x, posicao.y);
+      Object.assign(painel.style, { left: `${x}px`, top: `${y}px`, bottom: "auto" });
+    }
+
+    function salvarPosicao() {
+      if (!posicao) return;
+      try { localStorage.setItem(chave, JSON.stringify(posicao)); } catch { /* Mantém a posição nesta aba. */ }
+    }
+
+    alca.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || !event.isPrimary || arraste) return;
+      const { left, top } = painel.getBoundingClientRect();
+      arraste = { id: event.pointerId, dx: event.clientX - left, dy: event.clientY - top };
+      alca.setPointerCapture(event.pointerId);
+    });
+    alca.addEventListener("pointermove", event => {
+      if (arraste?.id !== event.pointerId) return;
+      posicao = limitar(event.clientX - arraste.dx, event.clientY - arraste.dy);
+      posicionar();
+    });
+    alca.addEventListener("lostpointercapture", event => {
+      if (arraste?.id !== event.pointerId) return;
+      arraste = null;
+      salvarPosicao();
+    });
+
+    const setas = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] };
+    alca.addEventListener("keydown", event => {
+      if (!Object.hasOwn(setas, event.key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const [dx, dy] = setas[event.key];
+      const { left, top } = painel.getBoundingClientRect();
+      posicao = limitar(left + dx, top + dy);
+      posicionar();
+      salvarPosicao();
+    });
+
+    window.addEventListener("resize", posicionar);
+    new ResizeObserver(posicionar).observe(painel);
+    posicionar();
+  }
+
   const LIMITE_LOOT = 100;
   const INTERVALO = 30_000;
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
@@ -30,7 +93,11 @@
         font: 14px/1.4 system-ui, sans-serif; }
       details[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      summary { font-weight: 700; }
+      summary { font-weight: 700; padding-right: 30px; }
+      #mover { position: absolute; top: 5px; right: 6px; width: 26px; height: 24px;
+        border: 1px solid #70849a; border-radius: 4px; background: #233346;
+        color: #f5f7fa; cursor: grab; touch-action: none; user-select: none; }
+      #mover:active { cursor: grabbing; }
       fieldset { margin: 8px 0; padding: 0; border: 0; min-width: 0; }
       fieldset > div { margin: 8px 0; }
       label { display: inline-block; }
@@ -56,10 +123,12 @@
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
       <p id="mensagem" role="status">Leia o estoque para escolher o que comprar e vender.</p>
-    </details>`;
+    </details>
+    <button id="mover" type="button" aria-label="Mover painel Auto Loja" title="Arraste para mover ou use as setas">⠿</button>`;
   document.body.append(painel);
 
   const campo = id => interfaceLoja.getElementById(id);
+  configurarArraste(painel, campo("mover"));
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
   const selecionados = new Set();
   const nomesLoot = new Map();
