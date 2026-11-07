@@ -1,5 +1,5 @@
 // Cole este arquivo no Console do navegador com o MultiPoke Idle aberto em /jogar.
-// Para parar, execute multiPokeCaptura.parar() ou recarregue a página.
+// Para pausar a captura nesta aba, execute multiPokeCaptura.parar().
 (() => {
   if (location.origin !== "https://multipoke.io" || !/^\/jogar\/?$/.test(location.pathname)) {
     console.warn("Abra https://multipoke.io/jogar antes de iniciar a autocaptura.");
