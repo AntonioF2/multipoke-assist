@@ -67,6 +67,7 @@
 
   const LIMITE_LOOT = 100;
   const INTERVALO = 30_000;
+  const INTERVALO_ESTOQUE = 5_000;
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
   const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
   const normalizar = texto => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -104,13 +105,17 @@
       input[type=number] { width: 76px; }
       select { max-width: 100%; }
       button, select, input { font: inherit; }
-      .loot { display: grid; max-height: 120px; overflow: auto; }
+      #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
+      .loot { display: grid; max-height: 170px; overflow: auto; }
+      .loot label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px;
+        padding: 5px 2px; border-bottom: 1px solid #35475b; }
+      .loot small { display: block; color: #c1d0df; }
       p { margin: 8px 0; }
     </style>
-    <details>
+    <details id="painel">
       <summary>Auto Loja <span id="estado"></span></summary>
       <fieldset id="config">
-        <button id="ler" type="button">Ler estoque da loja</button>
+        <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
         <div><label>Poké Bola <select id="bola"><option value="">Sem reposição</option></select></label>
           <br><label>Até <input id="bola-min" type="number" min="0" max="10000" value="10"></label>
           <label>Comprar <input id="bola-qtd" type="number" min="1" max="10000" value="50"></label></div>
@@ -118,11 +123,16 @@
           <br><label>Até <input id="pocao-min" type="number" min="0" max="10000" value="5"></label>
           <label>Comprar <input id="pocao-qtd" type="number" min="1" max="10000" value="25"></label></div>
         <div><label>Reserva de Pokédollars <input id="reserva" type="number" min="0" max="999999999" value="200"></label></div>
-        <div><label><input id="vender" type="checkbox"> Vender loot marcado</label>
-          <div id="loot" class="loot"></div></div>
+        <div><label>Venda automática <select id="modo-venda">
+            <option value="">Desligada</option>
+            <option value="marcados">Somente marcados para venda</option>
+            <option value="baratos">Loot barato, exceto protegidos</option>
+          </select></label>
+          <input id="buscar-loot" type="search" placeholder="Buscar loot por nome ou ID" aria-label="Buscar loot por nome ou ID">
+          <div id="loot" class="loot">Carregando o catálogo de loot…</div></div>
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
-      <p id="mensagem" role="status">Leia o estoque para escolher o que comprar e vender.</p>
+      <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
     </details>
     <button id="mover" type="button" aria-label="Mover painel Auto Loja" title="Arraste para mover ou use as setas">⠿</button>`;
   document.body.append(painel);
@@ -130,11 +140,13 @@
   const campo = id => interfaceLoja.getElementById(id);
   configurarArraste(painel, campo("mover"));
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
-  const selecionados = new Set();
-  const nomesLoot = new Map();
+  const regrasLoot = new Map();
+  let estoqueLoot = new Map();
   let catalogo;
+  let proximaConsultaCatalogo = 0;
   let sessao = null;
   let ocupada = false;
+  let estoqueLido = false;
   let treinadorConfigurado = "";
   let interacoes = 0;
   for (const evento of ["pointerdown", "keydown"]) {
@@ -144,23 +156,39 @@
   }
 
   async function carregarCatalogo() {
-    if (catalogo) return;
+    if (catalogo || Date.now() < proximaConsultaCatalogo) return;
+    proximaConsultaCatalogo = Date.now() + 60_000;
     const resposta = await fetch("/pokepedia/itens", {
       credentials: "omit", redirect: "error", signal: AbortSignal.timeout(8000),
     });
     if (!resposta.ok) throw new Error("Catálogo de loot indisponível.");
     const modelo = document.createElement("template");
     modelo.innerHTML = await resposta.text();
-    const permitidos = new Set();
-    for (const item of modelo.content.querySelectorAll('article[data-filter-kind="loot"][data-filter-available="yes"]')) {
-      const nome = normalizar(texto(item, "h2"));
+    const itens = new Map();
+    for (const item of modelo.content.querySelectorAll('article[data-filter-kind="loot"]')) {
+      const nome = texto(item, "h2");
+      const id = item.dataset.filterNumber;
+      if (!nome || !/^\d+$/.test(id)) continue;
       const preco = numero(texto(item, "p").match(/^Venda · ([\d.]+) Pokédollars$/)?.[1]);
-      if (nome && nome !== "ruby" && inteiro(preco, 1, LIMITE_LOOT)) {
-        permitidos.add(`${item.dataset.filterNumber}:${nome}`);
-      }
+      const vendavel = item.dataset.filterAvailable === "yes" && normalizar(nome) !== "ruby" &&
+        inteiro(preco, 1, LIMITE_LOOT);
+      itens.set(chaveLoot(`id:${id}`, nome), { id, nome, preco, vendavel });
     }
-    if (!permitidos.size) throw new Error("A Pokepédia não apresentou o catálogo de loot esperado.");
-    catalogo = permitidos;
+    if (!itens.size) throw new Error("A Pokepédia não apresentou o catálogo de loot esperado.");
+    catalogo = itens;
+  }
+
+  const chaveLoot = (id, nome) => `${id}:${normalizar(nome)}`;
+  const chaveRegras = () => `multipoke.auto-loja.loot.${treinadorConfigurado}`;
+
+  function carregarRegras() {
+    regrasLoot.clear();
+    try {
+      const salvas = JSON.parse(localStorage.getItem(chaveRegras()));
+      for (const [chave, regra] of Object.entries(salvas ?? {})) {
+        if (regra === "vender" || regra === "proteger") regrasLoot.set(chave, regra);
+      }
+    } catch { /* As regras podem ser usadas nesta aba sem armazenamento. */ }
   }
 
   function produto(linha) {
@@ -181,9 +209,10 @@
     const preco = numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
     const estoque = numero(texto(linha, ".loot-count strong").match(/^×\s*([\d.]+)$/)?.[1]);
     const digitado = Number(linha.querySelector("[data-loot-sale-qty]")?.value);
-    if (!catalogo?.has(`${id.slice(3)}:${normalizar(nome)}`) || !/^id:\d+$/.test(id) ||
-        !inteiro(preco, 1, LIMITE_LOOT) || !inteiro(estoque, 1, Number.MAX_SAFE_INTEGER)) return null;
-    return { id, nome, preco, estoque, qtd: inteiro(digitado, 1, estoque) ? digitado : estoque, caixa };
+    const chave = chaveLoot(id, nome);
+    if (!catalogo?.has(chave) || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
+        !inteiro(estoque, 1, Number.MAX_SAFE_INTEGER)) return null;
+    return { chave, nome, preco, estoque, qtd: inteiro(digitado, 1, estoque) ? digitado : estoque, caixa };
   }
 
   const produtos = () => [...loja().querySelectorAll("[data-shop-row]")].map(produto).filter(Boolean);
@@ -194,29 +223,74 @@
     const disponiveis = produtos();
     for (const tipo of ["bola", "pocao"]) {
       const select = campo(tipo);
+      if (interfaceLoja.activeElement === select) continue;
       const anterior = select.value;
-      select.length = 1;
-      for (const item of disponiveis.filter(item => item.tipo === tipo)) {
-        select.add(new Option(`${item.nome} · ${formatar(item.estoque)} na mochila`, item.id));
+      const itens = disponiveis.filter(item => item.tipo === tipo);
+      const opcoes = [...select.options].slice(1);
+      if (opcoes.length !== itens.length || itens.some((item, i) => item.id !== opcoes[i].value)) {
+        select.length = 1;
+        for (const item of itens) select.add(new Option("", item.id));
+        if (itens.some(item => item.id === anterior)) select.value = anterior;
       }
-      if ([...select.options].some(opcao => opcao.value === anterior)) select.value = anterior;
+      for (const [i, item] of itens.entries()) {
+        const rotulo = `${item.nome} · ${formatar(item.estoque)} na mochila`;
+        if (select.options[i + 1].text !== rotulo) select.options[i + 1].text = rotulo;
+      }
     }
-    const atuais = new Map(pilhas().map(item => [item.id, item]));
-    for (const item of atuais.values()) nomesLoot.set(item.id, item.nome);
+    if (loja().querySelector('[data-bag-sale-tab="loot"][aria-selected="true"], .loot-filters')) {
+      estoqueLoot = new Map(pilhas().map(item => [item.chave, item.estoque]));
+      for (const rotulo of campo("loot").querySelectorAll("[data-estoque-loot]")) atualizarRotuloLoot(rotulo);
+    }
+    const gold = saldo();
+    campo("estoque-status").textContent = Number.isFinite(gold) ? `Saldo na loja: ${formatar(gold)} Pokédollars.`
+      : "Aguardando o saldo da loja.";
+  }
+
+  function atualizarRotuloLoot(rotulo) {
+    const chave = rotulo.dataset.estoqueLoot;
+    const item = catalogo.get(chave);
+    const estoque = estoqueLoot.get(chave);
+    const partes = [`#${item.id}`];
+    if (Number.isFinite(item.preco)) partes.push(`${formatar(item.preco)} por unidade`);
+    if (estoque) partes.push(`${formatar(estoque)} na loja`);
+    if (!item.vendavel) partes.push("protegido pela regra de preço ou catálogo");
+    rotulo.textContent = partes.join(" · ");
+  }
+
+  function mostrarCatalogo() {
     const lista = campo("loot");
     lista.replaceChildren();
-    for (const [id, nome] of nomesLoot) {
-      const item = atuais.get(id);
-      if (!item && !selecionados.has(id)) continue;
+    if (!catalogo) {
+      lista.textContent = "Catálogo de loot indisponível. A leitura será repetida automaticamente.";
+      return;
+    }
+    const busca = normalizar(campo("buscar-loot").value.trim()).replace(/^#/, "");
+    for (const [chave, item] of catalogo) {
+      if (!normalizar(item.nome).includes(busca) && !item.id.includes(busca)) continue;
       const label = document.createElement("label");
-      const caixa = document.createElement("input");
-      caixa.type = "checkbox";
-      caixa.checked = selecionados.has(id);
-      caixa.addEventListener("change", () => caixa.checked ? selecionados.add(id) : selecionados.delete(id));
-      label.append(caixa, item ? ` ${nome} · ${formatar(item.preco)} cada · ${formatar(item.estoque)} em estoque` : ` ${nome} · sem estoque`);
+      const nome = document.createElement("span");
+      const rotulo = document.createElement("small");
+      rotulo.dataset.estoqueLoot = chave;
+      atualizarRotuloLoot(rotulo);
+      nome.append(item.nome, rotulo);
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", `Regra de ${item.nome} #${item.id}`);
+      select.add(new Option("Sem regra", ""));
+      if (item.vendavel) select.add(new Option("Vender", "vender"));
+      select.add(new Option("Proteger", "proteger"));
+      select.value = [...select.options].some(opcao => opcao.value === regrasLoot.get(chave))
+        ? regrasLoot.get(chave) : "";
+      select.addEventListener("change", () => {
+        if (treinador() !== treinadorConfigurado) return;
+        if (select.value) regrasLoot.set(chave, select.value);
+        else regrasLoot.delete(chave);
+        try { localStorage.setItem(chaveRegras(), JSON.stringify(Object.fromEntries(regrasLoot))); }
+        catch { /* Mantém as regras nesta aba. */ }
+      });
+      label.append(nome, select);
       lista.append(label);
     }
-    if (!lista.childElementCount) lista.textContent = catalogo ? "Nenhum loot elegível na mochila." : "Catálogo de loot indisponível.";
+    if (!lista.childElementCount) lista.textContent = "Nenhum loot corresponde à busca.";
   }
 
   function abaLoja(tipo) {
@@ -231,13 +305,17 @@
   function comLoja(abertaPeloUsuario, executar) {
     const aberta = Boolean(loja());
     const inicio = interacoes;
+    const foco = interfaceLoja.activeElement ?? document.activeElement;
     if (!jogo("#game-shell:not([inert])") || modal() ||
         jogo("#starter-overlay:not([hidden]), #hunt-map-overlay:not([hidden])") ||
         (jogo("#drawer.open") && !(abertaPeloUsuario && aberta))) return;
     if (!aberta) jogo("#nav-bag:not(:disabled)")?.click();
     if (!loja()) return;
-    return Promise.resolve().then(executar).finally(() => {
-      if (!aberta && inicio === interacoes && loja() && !modal()) jogo("#drawer-close")?.click();
+    return Promise.resolve().then(() => executar(aberta)).finally(() => {
+      if (!aberta && inicio === interacoes && loja() && !modal()) {
+        jogo("#drawer-close")?.click();
+        if (foco?.isConnected) foco.focus({ preventScroll: true });
+      }
     });
   }
 
@@ -314,18 +392,23 @@
     return pedido;
   }
 
-  async function vender(ids) {
+  async function vender(modo) {
     abaLoja("loot");
-    const alvo = pilhas().filter(item => ids.has(item.id));
+    const permitido = item => {
+      if (!item || !catalogo?.get(item.chave)?.vendavel || item.preco > LIMITE_LOOT) return false;
+      const regra = regrasLoot.get(item.chave);
+      return regra === "vender" || (modo === "baratos" && regra !== "proteger");
+    };
+    const alvo = pilhas().filter(permitido);
     if (!alvo.length) return;
     if (caixasLoot().some(caixa => caixa.checked)) throw new Error("Há uma seleção manual de loot na loja. Limpe-a antes de retomar.");
 
     const inicio = interacoes;
     try {
-      for (const { id } of alvo) pilhas().find(item => item.id === id)?.caixa.click();
+      for (const { chave } of alvo) pilhas().find(item => item.chave === chave)?.caixa.click();
       const marcado = caixasLoot().filter(caixa => caixa.checked);
       const itens = marcado.map(pilha);
-      if (itens.length !== alvo.length || itens.some(item => !item || !ids.has(item.id))) {
+      if (itens.length !== alvo.length || !itens.every(permitido)) {
         throw new Error("A seleção da loja mudou antes da venda.");
       }
       const total = itens.reduce((soma, item) => soma + item.qtd * item.preco, 0);
@@ -344,7 +427,7 @@
             [...dialogo.querySelectorAll(".ui-confirm__details dd")].at(-1)?.textContent.trim() === `$ ${formatar(total)}`;
         });
       }, mensagem => mensagem === `${formatar(quantidade)} itens vendidos por ${formatar(total)} Pokédollars.`,
-      () => itens.every(item => !pilhas().some(atual => atual.id === item.id && atual.estoque >= item.estoque)));
+      () => itens.every(item => !pilhas().some(atual => atual.chave === item.chave && atual.estoque >= item.estoque)));
       return `${formatar(quantidade)} loots por ${formatar(total)} Pokédollars`;
     } finally {
       if (inicio === interacoes && loja() && !modal()) loja().querySelector("[data-clear-loot-selection]:not(:disabled)")?.click();
@@ -365,7 +448,7 @@
     const inicio = interacoes;
     const continua = () => sessao === atual && treinador() === atual.treinador && cacada() &&
       inicio === interacoes && document.hasFocus() && !document.hidden && jogo("#game-shell:not([inert])");
-    if (treinador() !== atual.treinador) return pausar("Treinador mudou. Leia o estoque novamente.");
+    if (treinador() !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
     if (!continua()) return;
     ocupada = true;
     try {
@@ -378,14 +461,13 @@
             const compra = await comprar(regra, atual.reserva);
             if (compra) realizadas.push(`Comprou ${compra}`);
           }
-          if (atual.vendas.size && continua() && loja() && !modal()) {
-            const venda = await vender(atual.vendas);
+          if (atual.modoVenda && continua() && loja() && !modal()) {
+            const venda = await vender(atual.modoVenda);
             if (venda) realizadas.push(`Vendeu ${venda}`);
           }
           if (continua() && loja() && !modal()) {
-            abaLoja("loot");
             mostrarEstoque();
-            informar(realizadas.join(". ") || "Aguardando estoque baixo ou loot marcado. A reserva é respeitada.");
+            informar(realizadas.join(". ") || "Aguardando estoque baixo ou loot elegível para venda.");
           }
         });
       });
@@ -396,54 +478,69 @@
     }
   }
 
-  campo("ler").addEventListener("click", async () => {
-    if (ocupada || sessao) return;
+  async function atualizarEstoque() {
+    if (!campo("painel").open || ocupada || document.hidden || !document.hasFocus() ||
+        !jogo("#game-shell:not([inert])")) return;
+    const nome = treinador();
+    if (!nome) return;
+    if (treinadorConfigurado !== nome) {
+      if (sessao) pausar("Treinador mudou. Confira as regras antes de retomar.");
+      treinadorConfigurado = nome;
+      estoqueLido = false;
+      estoqueLoot.clear();
+      carregarRegras();
+      if (catalogo) mostrarCatalogo();
+      campo("bola").value = campo("pocao").value = campo("modo-venda").value = "";
+    }
+    if (!catalogo && Date.now() >= proximaConsultaCatalogo) {
+      void carregarCatalogo().catch(() => {}).finally(mostrarCatalogo);
+    }
+    const foco = interfaceLoja.activeElement ?? document.activeElement;
+    if (!loja() && foco?.matches("input, select, textarea, [contenteditable='true']")) return;
     ocupada = true;
-    campo("config").disabled = true;
-    informar("Lendo estoque e catálogo…");
     try {
-      await carregarCatalogo().catch(() => {});
-      const leitura = comLoja(true, () => {
-        if (treinadorConfigurado !== treinador()) {
-          selecionados.clear();
-          nomesLoot.clear();
-          campo("bola").value = campo("pocao").value = "";
-          campo("vender").checked = false;
-        }
-        treinadorConfigurado = treinador();
-        abaLoja("loot");
+      await comLoja(true, jaAberta => {
+        if (treinador() !== nome) return;
+        if (!jaAberta) abaLoja("loot");
         mostrarEstoque();
-        informar(catalogo ? `Saldo na loja: ${formatar(saldo())} Pokédollars. Escolha os produtos ou marque o loot.`
-          : "Reposição disponível. O catálogo de loot não pôde ser validado.");
+        estoqueLido = true;
       });
-      if (leitura) await leitura;
-      else informar("Feche o menu aberto e tente ler a Loja de Pokédollars novamente.");
     } catch {
-      informar("Não consegui ler os controles da loja. Confira se ela está disponível e tente novamente.");
+      campo("estoque-status").textContent = "Aguardando os controles da loja.";
     } finally {
       ocupada = false;
-      campo("config").disabled = false;
     }
+  }
+
+  campo("buscar-loot").addEventListener("input", mostrarCatalogo);
+  campo("painel").addEventListener("toggle", atualizarEstoque);
+  window.addEventListener("storage", event => {
+    if (!treinadorConfigurado || event.key !== chaveRegras()) return;
+    carregarRegras();
+    mostrarCatalogo();
   });
 
   campo("alternar").addEventListener("click", () => {
     if (sessao) return pausar("Auto Loja pausada.");
     if (ocupada) return;
-    if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return informar("Leia o estoque da loja primeiro.");
+    if (!estoqueLido || treinador() !== treinadorConfigurado) return informar("Aguarde a leitura automática do estoque.");
     const compras = ["bola", "pocao"].map(tipo => ({
       id: campo(tipo).value,
       minimo: campo(`${tipo}-min`).valueAsNumber,
       qtd: campo(`${tipo}-qtd`).valueAsNumber,
     })).filter(regra => regra.id);
-    const vendas = campo("vender").checked ? new Set(selecionados) : new Set();
-    if (campo("vender").checked && !vendas.size) return informar("Marque os itens de loot que quer vender.");
-    if (!compras.length && !vendas.size) return informar("Escolha uma reposição ou marque loot para vender.");
+    const modoVenda = campo("modo-venda").value;
+    if (modoVenda && !catalogo) return informar("Aguarde o catálogo de loot.");
+    if (modoVenda === "marcados" && ![...regrasLoot].some(([chave, regra]) =>
+      regra === "vender" && catalogo.get(chave)?.vendavel,
+    )) return informar("Marque os itens de loot que quer vender.");
+    if (!compras.length && !modoVenda) return informar("Escolha uma reposição ou um modo de venda.");
     const reserva = campo("reserva").valueAsNumber;
     if ((compras.length && !inteiro(reserva, 0, 999_999_999)) ||
         compras.some(regra => !inteiro(regra.minimo, 0, 10_000) || !inteiro(regra.qtd, 1, 10_000))) {
       return informar("Confira os números de estoque mínimo, quantidade e reserva.");
     }
-    sessao = { treinador: treinadorConfigurado, compras, vendas, reserva };
+    sessao = { treinador: treinadorConfigurado, compras, modoVenda, reserva };
     campo("config").disabled = true;
     campo("estado").textContent = "· ativa";
     campo("alternar").textContent = "Pausar Auto Loja";
@@ -452,4 +549,5 @@
   });
 
   setInterval(ciclo, INTERVALO);
+  setInterval(atualizarEstoque, INTERVALO_ESTOQUE);
 })();
