@@ -89,12 +89,14 @@
   interfaceLoja.innerHTML = `
     <style>
       :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: dark; }
-      details { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: #f5f7fa;
+      #painel { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: #f5f7fa;
         background: #172230; border: 1px solid #70849a; border-radius: 8px; padding: 8px 12px;
         font: 14px/1.4 system-ui, sans-serif; }
-      details[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
+      #painel[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      summary { font-weight: 700; padding-right: 30px; }
+      #painel > summary { font-weight: 700; padding-right: 30px; }
+      #regras-loot { margin-top: 8px; }
+      #regras-loot > summary { font-weight: 600; }
       #mover { position: absolute; top: 5px; right: 6px; width: 26px; height: 24px;
         border: 1px solid #70849a; border-radius: 4px; background: #233346;
         color: #f5f7fa; cursor: grab; touch-action: none; user-select: none; }
@@ -128,8 +130,12 @@
             <option value="marcados">Somente marcados para venda</option>
             <option value="baratos">Loot barato, exceto protegidos</option>
           </select></label>
-          <input id="buscar-loot" type="search" placeholder="Buscar loot por nome ou ID" aria-label="Buscar loot por nome ou ID">
-          <div id="loot" class="loot">Carregando o catálogo de loot…</div></div>
+          <details id="regras-loot">
+            <summary>Regras de loot</summary>
+            <input id="buscar-loot" type="search" placeholder="Buscar loot por nome ou ID" aria-label="Buscar loot por nome ou ID">
+            <div id="loot" class="loot">Carregando o catálogo de loot…</div>
+          </details>
+        </div>
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
       <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
