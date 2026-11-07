@@ -66,6 +66,8 @@
   }
 
   const LIMITE_LOOT = 100;
+  const LIMITE_LOTE_POKEMON = 10;
+  const QUALIDADE_LENDARIA = 1.70;
   const INTERVALO = 30_000;
   const INTERVALO_ESTOQUE = 5_000;
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
@@ -108,8 +110,10 @@
         text-shadow: 1px 2px var(--azul); white-space: nowrap; }
       #estado { font-size: 12px; font-weight: 700; }
       #estado:empty { display: none; }
-      #regras-loot { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
-      #regras-loot > summary { font-weight: 700; }
+      .regras { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
+      .regras > summary { font-weight: 700; }
+      #regras-pokemon label { margin: 3px 0; }
+      #pokemon-qualidade { width: 76px; }
       #mover { position: absolute; z-index: 2; top: 18px; right: 12px; width: 28px; height: 28px;
         border: 1px solid #fff6; border-radius: 6px; background: #811827; color: #fff;
         font: 18px/1 system-ui, sans-serif; cursor: grab; touch-action: none; user-select: none; }
@@ -157,12 +161,23 @@
             <option value="marcados">Somente marcados para venda</option>
             <option value="baratos">Loot barato, exceto protegidos</option>
           </select></label>
-          <details id="regras-loot">
+          <details id="regras-loot" class="regras">
             <summary>Regras de loot</summary>
             <input id="buscar-loot" type="search" placeholder="Buscar loot por nome ou ID" aria-label="Buscar loot por nome ou ID">
             <div id="loot" class="loot">Carregando o catálogo de loot…</div>
           </details>
         </div>
+        <details id="regras-pokemon" class="regras">
+          <summary>Venda de Pokémon</summary>
+          <label><input id="vender-pokemon" type="checkbox"> Ativar venda de Pokémon</label><br>
+          <label>Qualidade abaixo de <input id="pokemon-qualidade" type="text" inputmode="decimal" placeholder="1,30" maxlength="4"></label><br>
+          <label>IV total abaixo de <input id="pokemon-iv" type="number" min="6" max="193" placeholder="80"></label><br>
+          <label>Combinar filtros <select id="pokemon-condicao">
+            <option value="e">E · precisa cumprir os dois</option>
+            <option value="ou">OU · basta cumprir um</option>
+          </select></label>
+          <p><small>Preencha pelo menos um limite. Qualidade Lendária ou superior fica protegida.</small></p>
+        </details>
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
       <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
@@ -175,6 +190,7 @@
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
   const tiposCompra = ["bola", "pocao"];
   const camposCompra = [...tiposCompra, "bola-min", "bola-qtd", "pocao-min", "pocao-qtd", "reserva"];
+  const camposPokemon = ["pokemon-qualidade", "pokemon-iv", "pokemon-condicao"];
   const escolhasCompra = new Map();
   const regrasLoot = new Map();
   let estoqueLoot = new Map();
@@ -217,6 +233,7 @@
   const chaveLoot = (id, nome) => `${id}:${normalizar(nome)}`;
   const chaveRegras = () => `multipoke.auto-loja.loot.${treinadorConfigurado}`;
   const chaveCompra = id => `multipoke.auto-loja.compra.${treinadorConfigurado}.${id}`;
+  const chavePokemon = id => `multipoke.auto-loja.pokemon.${treinadorConfigurado}.${id}`;
 
   function carregarCompras() {
     for (const id of camposCompra) {
@@ -350,8 +367,8 @@
     const layout = loja();
     if (layout.dataset.mode === "tabs") {
       layout.parentElement.querySelector(`[data-bag-tab="${tipo}"][aria-selected="false"]`)?.click();
-    } else if (tipo === "loot") {
-      layout.querySelector('[data-bag-sale-tab="loot"][aria-selected="false"]')?.click();
+    } else if (tipo !== "shop") {
+      layout.querySelector(`[data-bag-sale-tab="${tipo}"][aria-selected="false"]`)?.click();
     }
   }
 
@@ -487,6 +504,91 @@
     }
   }
 
+  function pokemonElegivel(linha, filtro) {
+    const caixa = linha.querySelector("input[data-sale-select]:not(:disabled)");
+    const id = linha.dataset.pokemonId;
+    if (!id || caixa?.dataset.saleSelect !== id || linha.matches('[data-shiny="true"], [data-holo="true"]')) return null;
+    const selo = texto(linha, ".quality-badge").match(/^(.+) · (\d+,\d{2})×$/);
+    const qualidade = Number(selo?.[2].replace(",", "."));
+    const iv = numero(texto(linha, ".pokemon-iv-total").match(/^(\d+)\/192$/)?.[1]);
+    const preco = numero(texto(linha, ".pokemon-sale-price strong").match(/^\$\s*([\d.]+)$/)?.[1]);
+    if (!(qualidade > 0 && qualidade < QUALIDADE_LENDARIA) || !inteiro(iv, 6, 192) || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER)) return null;
+    const atende = [];
+    if (filtro.qualidade !== null) atende.push(qualidade < filtro.qualidade);
+    if (filtro.iv !== null) atende.push(iv < filtro.iv);
+    if (!(filtro.condicao === "ou" ? atende.some(Boolean) : atende.every(Boolean))) return null;
+    return { id, caixa, preco, faixa: selo[1] };
+  }
+
+  async function venderPokemon(filtro, continua) {
+    const layout = loja();
+    const abaAnterior = layout.dataset.mode === "tabs" ? layout.dataset.activeTab
+      : layout.querySelector('[data-bag-sale-tab][aria-selected="true"]')?.dataset.bagSaleTab;
+    const caixas = () => [...layout.querySelectorAll(".pokemon-sale-row [data-sale-select]:checked")];
+    const limpar = () => layout.querySelector("[data-clear-sale-selection]");
+    const candidatos = () => [...layout.querySelectorAll(".pokemon-sale-row")]
+      .map(linha => pokemonElegivel(linha, filtro)).filter(Boolean);
+    abaLoja("pokemon");
+    const rolagem = layout.querySelector(".bag-sell-panel");
+    if (!rolagem?.clientHeight) return;
+    const topo = rolagem.scrollTop;
+    let marcou = false;
+    try {
+      if (limpar() || caixas().length) throw new Error("Há Pokémon selecionados manualmente na loja. Limpe a seleção antes de retomar.");
+      rolagem.scrollTop = 0;
+      let lote;
+      while (continua() && loja() === layout && !modal()) {
+        lote = candidatos().slice(0, LIMITE_LOTE_POKEMON);
+        if (lote.length || rolagem.scrollTop + rolagem.clientHeight >= rolagem.scrollHeight - 1) break;
+        const antes = rolagem.scrollTop;
+        rolagem.scrollTop += Math.max(1, Math.floor(rolagem.clientHeight * 0.8));
+        if (rolagem.scrollTop === antes) break;
+        // A lista do jogo só monta no DOM os cartões próximos à área visível.
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      if (!lote?.length || !continua() || loja() !== layout || modal()) return;
+      marcou = true;
+      for (const { id } of lote) candidatos().find(item => item.id === id)?.caixa.click();
+
+      const itens = candidatos().filter(item => item.caixa.checked);
+      const quantidade = formatar(itens.length);
+      const preco = itens.reduce((soma, item) => soma + item.preco, 0);
+      const barra = layout.querySelector(".sale-selection-sticky");
+      const botao = barra?.querySelector("[data-bulk-sell-sale-pokemon]:not(:disabled)");
+      const ids = new Set(lote.map(item => item.id));
+      if (itens.length !== lote.length || caixas().length !== itens.length || !itens.every(item => ids.has(item.id)) ||
+          !Number.isSafeInteger(preco) || !botao || texto(barra, "strong") !== `${quantidade} selecionados no filtro` ||
+          texto(barra, "small") !== `${formatar(preco)} Pokédollars`) {
+        throw new Error("A seleção de Pokémon mudou antes da venda.");
+      }
+
+      const faixas = new Map();
+      for (const { faixa } of itens) faixas.set(faixa, (faixas.get(faixa) ?? 0) + 1);
+      const esperado = new Map([["Pokémon na venda", quantidade], ["Total", `$ ${formatar(preco)}`]]);
+      for (const [faixa, quantidade] of faixas) esperado.set(faixa, formatar(quantidade));
+      await comprovante(() => {
+        if (!continua() || modal()) return false;
+        const semDialogo = localStorage.getItem("multipoke-hide-sale-confirmation:pokemon") === "true";
+        botao.click();
+        const dialogo = modal();
+        if (!dialogo) return semDialogo;
+        return confirmar(dialogo, "Confirmar venda de Pokémon", "Vender", dialogo => {
+          const linhas = [...dialogo.querySelectorAll(".ui-confirm__details > div")];
+          return linhas.length === esperado.size && new Set(linhas.map(linha => texto(linha, "dt"))).size === esperado.size &&
+            linhas.every(linha => esperado.get(texto(linha, "dt")) === texto(linha, "dd"));
+        });
+      }, mensagem => mensagem === `${quantidade} Pokémon vendidos por ${formatar(preco)} Pokédollars.`,
+      () => !limpar() && !caixas().length);
+      return `${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
+    } finally {
+      if (continua() && loja() === layout && !modal()) {
+        if (marcou) limpar()?.click();
+        rolagem.scrollTop = topo;
+        if (abaAnterior) abaLoja(abaAnterior);
+      }
+    }
+  }
+
   function pausar(mensagem) {
     sessao = null;
     campo("estado").textContent = "";
@@ -518,9 +620,13 @@
             const venda = await vender(atual.modoVenda);
             if (venda) realizadas.push(`Vendeu ${venda}`);
           }
+          if (atual.filtroPokemon && continua() && loja() && !modal()) {
+            const venda = await venderPokemon(atual.filtroPokemon, continua);
+            if (venda) realizadas.push(`Vendeu ${venda}`);
+          }
           if (continua() && loja() && !modal()) {
             mostrarEstoque();
-            informar(realizadas.join(". ") || "Aguardando estoque baixo ou loot elegível para venda.");
+            informar(realizadas.join(". ") || "Aguardando reposição ou itens elegíveis para venda.");
           }
         });
       });
@@ -543,6 +649,13 @@
       estoqueLoot.clear();
       carregarCompras();
       carregarRegras();
+      for (const id of camposPokemon) {
+        const controle = campo(id);
+        const padrao = id === "pokemon-condicao" ? "e" : "";
+        try { controle.value = localStorage.getItem(chavePokemon(id)) ?? padrao; }
+        catch { controle.value = padrao; }
+      }
+      campo("vender-pokemon").checked = false;
       if (catalogo) mostrarCatalogo();
       campo("modo-venda").value = "";
     }
@@ -579,6 +692,13 @@
       catch { /* A configuração continua disponível nesta aba. */ }
     });
   }
+  for (const id of camposPokemon) {
+    campo(id).addEventListener("input", () => {
+      if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return;
+      try { localStorage.setItem(chavePokemon(id), campo(id).value); }
+      catch { /* A configuração continua disponível nesta aba. */ }
+    });
+  }
   window.addEventListener("storage", event => {
     if (!treinadorConfigurado || event.key !== chaveRegras()) return;
     carregarRegras();
@@ -599,13 +719,25 @@
     if (modoVenda === "marcados" && ![...regrasLoot].some(([chave, regra]) =>
       regra === "vender" && catalogo.get(chave)?.vendavel,
     )) return informar("Marque os itens de loot que quer vender.");
-    if (!compras.length && !modoVenda) return informar("Escolha uma reposição ou um modo de venda.");
+    let filtroPokemon = null;
+    if (campo("vender-pokemon").checked) {
+      const entradaQualidade = campo("pokemon-qualidade").value.trim();
+      const qualidade = entradaQualidade ? Number(entradaQualidade.replace(",", ".")) : null;
+      const iv = campo("pokemon-iv").value ? campo("pokemon-iv").valueAsNumber : null;
+      if ((qualidade === null && iv === null) || (qualidade !== null &&
+          (!/^\d(?:[.,]\d{1,2})?$/.test(entradaQualidade) || qualidade <= 0 || qualidade > QUALIDADE_LENDARIA)) ||
+          (iv !== null && !inteiro(iv, 6, 193))) {
+        return informar("Preencha pelo menos um limite válido para Pokémon. Qualidade até 1,70 ou IV de 6 a 193.");
+      }
+      filtroPokemon = { qualidade, iv, condicao: campo("pokemon-condicao").value };
+    }
+    if (!compras.length && !modoVenda && !filtroPokemon) return informar("Escolha uma reposição ou um modo de venda.");
     const reserva = campo("reserva").valueAsNumber;
     if ((compras.length && !inteiro(reserva, 0, 999_999_999)) ||
         compras.some(regra => !inteiro(regra.minimo, 0, 10_000) || !inteiro(regra.qtd, 1, 10_000))) {
       return informar("Confira os números de estoque mínimo, quantidade e reserva.");
     }
-    sessao = { treinador: treinadorConfigurado, compras, modoVenda, reserva };
+    sessao = { treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva };
     campo("config").disabled = true;
     campo("estado").textContent = "· ativa";
     campo("alternar").textContent = "Pausar Auto Loja";
