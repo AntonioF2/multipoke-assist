@@ -88,34 +88,74 @@
   const interfaceLoja = painel.attachShadow({ mode: "open" });
   interfaceLoja.innerHTML = `
     <style>
-      :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: dark; }
-      #painel { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: #f5f7fa;
-        background: #172230; border: 1px solid #70849a; border-radius: 8px; padding: 8px 12px;
-        font: 14px/1.4 system-ui, sans-serif; }
+      :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: light;
+        --azul: #203961; --vermelho: #b92033; --amarelo: #ffcb36; --papel: #fffdf6; }
+      #painel { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
+        background: var(--papel); border: 2px solid var(--azul); border-radius: 12px;
+        box-shadow: 0 4px 0 #152641, 0 10px 24px #101d3340; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
       #painel[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      #painel > summary { font-weight: 700; padding-right: 30px; }
-      #regras-loot { margin-top: 8px; }
-      #regras-loot > summary { font-weight: 600; }
-      #mover { position: absolute; top: 5px; right: 6px; width: 26px; height: 24px;
-        border: 1px solid #70849a; border-radius: 4px; background: #233346;
-        color: #f5f7fa; cursor: grab; touch-action: none; user-select: none; }
+      #painel > summary { position: sticky; top: 0; z-index: 1; display: flex; align-items: center;
+        gap: 8px; list-style: none; padding: 7px 46px 7px 10px; background: var(--vermelho);
+        border-bottom: 3px solid var(--amarelo); color: #fff; }
+      #painel > summary::-webkit-details-marker { display: none; }
+      #painel > summary::before { content: ""; width: 6px; height: 6px; flex: 0 0 auto;
+        border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(-45deg); }
+      #painel[open] > summary::before { transform: rotate(45deg); }
+      #dragonite { width: 44px; height: 44px; flex: 0 0 auto; background: #fff5d6;
+        border: 1px solid var(--amarelo); border-radius: 8px; }
+      .titulo { display: block; color: var(--amarelo); font-size: 19px; font-weight: 900;
+        text-shadow: 1px 2px var(--azul); white-space: nowrap; }
+      #estado { font-size: 12px; font-weight: 700; }
+      #estado:empty { display: none; }
+      #regras-loot { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
+      #regras-loot > summary { font-weight: 700; }
+      #mover { position: absolute; z-index: 2; top: 16px; right: 12px; width: 28px; height: 28px;
+        border: 1px solid #fff6; border-radius: 6px; background: #811827; color: #fff;
+        font: 18px/1 system-ui, sans-serif; cursor: grab; touch-action: none; user-select: none; }
       #mover:active { cursor: grabbing; }
-      fieldset { margin: 8px 0; padding: 0; border: 0; min-width: 0; }
+      fieldset { margin: 0; padding: 0 12px; border: 0; min-width: 0; }
       fieldset > div { margin: 8px 0; }
       label { display: inline-block; }
       input[type=number] { width: 76px; }
       select { max-width: 100%; }
       button, select, input { font: inherit; }
+      select, input { box-sizing: border-box; min-height: 26px; padding: 2px 5px;
+        border: 1px solid #a6b7d0; border-radius: 5px; background: #fff; color: var(--azul); }
+      select:disabled, input:disabled { background: #edf1f7; color: #5b6c87; cursor: default; }
+      :is(summary, button, select, input):focus-visible { outline: 2px solid #2d61b1; outline-offset: 2px; }
+      :is(#painel > summary, #mover):focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
       #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
       .loot { display: grid; max-height: 170px; overflow: auto; }
       .loot label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px;
-        padding: 5px 2px; border-bottom: 1px solid #35475b; }
-      .loot small { display: block; color: #c1d0df; }
+        padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
+      .loot small { display: block; color: #445b7d; }
+      #alternar { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
+        background: var(--amarelo); border: 1px solid var(--azul); border-radius: 7px;
+        color: var(--azul); font-weight: 800; }
+      #alternar:hover { background: #ffda67; }
+      #mensagem { margin: 8px 12px 12px; color: #445b7d; font-size: 12px; }
       p { margin: 8px 0; }
     </style>
     <details id="painel">
-      <summary>Auto Loja <span id="estado"></span></summary>
+      <summary>
+        <svg id="dragonite" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
+          <!-- Asas e cauda -->
+          <path fill="#44283c" d="M1 6h2v1h2v1h2v1h2v7H6v-2H4v-2H2V9H1z M23 6h-2v1h-2v1h-2v1h-2v7h3v-2h2v-2h2V9h1z M15 18h4v-1h2v-2h2v4h-1v2h-2v1h-5z"/>
+          <path fill="#429687" d="M2 7h1v1h2v1h2v5H6v-2H4v-2H3V8H2z M22 7h-1v1h-2v1h-2v5h1v-2h2v-2h1V8h1z"/>
+          <path fill="#a3d6a6" d="M3 8h2v1h2v1H5v-1H3z M21 8h-2v1h-2v1h2v-1h2z"/>
+          <path fill="#e98533" d="M16 19h4v-1h2v1h-1v1h-2v1h-3z"/>
+          <!-- Contorno, antenas e corpo -->
+          <path fill="#44283c" d="M7 1h2v1h1v2h4V2h1V1h2v2h-2v2h2v1h1v5h1v1h1v3h-2v5h-1v2h-5v-1h-1v1H6v-2H5v-5H3v-3h1v-1h2V6h1V5h2V3H7z"/>
+          <path fill="#f6a143" d="M8 2h1v2H8z M15 2h1v2h-1z M8 5h8v1h1v5h1v1h1v2h-2v6h-1v1h-3v-1h-3v1H7v-1H6v-6H4v-2h2v-1h1V6h1z"/>
+          <path fill="#e37a31" d="M6 14h1v5h2v1H7v-1H6z M16 14h1v5h-1v1h-2v-1h2z M4 13h2v1H4z M17 13h2v1h-2z"/>
+          <path fill="#ffdc89" d="M9 5h5v1H9z M8 7h1v2H8z M9 11h6v1h1v6h-1v1H9v-1H8v-6h1z"/>
+          <path fill="#fff0b7" d="M9 10h6v2H9z M9 13h6v1H9z M9 16h6v1H9z"/>
+          <path fill="#44283c" d="M9 8h1v2H9z M14 8h1v2h-1z M11 11h2v1h-2z"/>
+          <path fill="#fff" d="M9 8h1v1H9z M14 8h1v1h-1z"/>
+        </svg>
+        <span><span class="titulo">Auto Loja</span><span id="estado"></span></span>
+      </summary>
       <fieldset id="config">
         <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
         <div><label>Poké Bola <select id="bola"><option value="">Sem reposição</option></select></label>
