@@ -102,15 +102,15 @@
       #painel > summary::before { content: ""; width: 6px; height: 6px; flex: 0 0 auto;
         border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(-45deg); }
       #painel[open] > summary::before { transform: rotate(45deg); }
-      #dragonite { width: 44px; height: 44px; flex: 0 0 auto; background: #fff5d6;
-        border: 1px solid var(--amarelo); border-radius: 8px; }
+      #dragonite { width: 48px; height: 48px; flex: 0 0 auto; background: #fff5d6;
+        border: 1px solid var(--amarelo); border-radius: 8px; object-fit: contain; image-rendering: pixelated; }
       .titulo { display: block; color: var(--amarelo); font-size: 19px; font-weight: 900;
         text-shadow: 1px 2px var(--azul); white-space: nowrap; }
       #estado { font-size: 12px; font-weight: 700; }
       #estado:empty { display: none; }
       #regras-loot { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
       #regras-loot > summary { font-weight: 700; }
-      #mover { position: absolute; z-index: 2; top: 16px; right: 12px; width: 28px; height: 28px;
+      #mover { position: absolute; z-index: 2; top: 18px; right: 12px; width: 28px; height: 28px;
         border: 1px solid #fff6; border-radius: 6px; background: #811827; color: #fff;
         font: 18px/1 system-ui, sans-serif; cursor: grab; touch-action: none; user-select: none; }
       #mover:active { cursor: grabbing; }
@@ -139,21 +139,8 @@
     </style>
     <details id="painel">
       <summary>
-        <svg id="dragonite" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
-          <!-- Asas e cauda -->
-          <path fill="#44283c" d="M1 6h2v1h2v1h2v1h2v7H6v-2H4v-2H2V9H1z M23 6h-2v1h-2v1h-2v1h-2v7h3v-2h2v-2h2V9h1z M15 18h4v-1h2v-2h2v4h-1v2h-2v1h-5z"/>
-          <path fill="#429687" d="M2 7h1v1h2v1h2v5H6v-2H4v-2H3V8H2z M22 7h-1v1h-2v1h-2v5h1v-2h2v-2h1V8h1z"/>
-          <path fill="#a3d6a6" d="M3 8h2v1h2v1H5v-1H3z M21 8h-2v1h-2v1h2v-1h2z"/>
-          <path fill="#e98533" d="M16 19h4v-1h2v1h-1v1h-2v1h-3z"/>
-          <!-- Contorno, antenas e corpo -->
-          <path fill="#44283c" d="M7 1h2v1h1v2h4V2h1V1h2v2h-2v2h2v1h1v5h1v1h1v3h-2v5h-1v2h-5v-1h-1v1H6v-2H5v-5H3v-3h1v-1h2V6h1V5h2V3H7z"/>
-          <path fill="#f6a143" d="M8 2h1v2H8z M15 2h1v2h-1z M8 5h8v1h1v5h1v1h1v2h-2v6h-1v1h-3v-1h-3v1H7v-1H6v-6H4v-2h2v-1h1V6h1z"/>
-          <path fill="#e37a31" d="M6 14h1v5h2v1H7v-1H6z M16 14h1v5h-1v1h-2v-1h2z M4 13h2v1H4z M17 13h2v1h-2z"/>
-          <path fill="#ffdc89" d="M9 5h5v1H9z M8 7h1v2H8z M9 11h6v1h1v6h-1v1H9v-1H8v-6h1z"/>
-          <path fill="#fff0b7" d="M9 10h6v2H9z M9 13h6v1H9z M9 16h6v1H9z"/>
-          <path fill="#44283c" d="M9 8h1v2H9z M14 8h1v2h-1z M11 11h2v1h-2z"/>
-          <path fill="#fff" d="M9 8h1v1H9z M14 8h1v1h-1z"/>
-        </svg>
+        <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
+        <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48">
         <span><span class="titulo">Auto Loja</span><span id="estado"></span></span>
       </summary>
       <fieldset id="config">
