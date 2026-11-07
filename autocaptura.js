@@ -17,6 +17,7 @@
   const tentados = new Set();
 
   function clicarSeDisponivel() {
+    if (!atualizarEstado()) return;
     const botoes = Array.from(document.querySelectorAll(seletor), botao => ({
       botao,
       alvo: botao.dataset.captureCorpse ?? botao.dataset.economyCapture,
@@ -43,7 +44,32 @@
 
   let intervalo = null;
 
+  function escolhaBolaReposicao() {
+    const treinador = document.querySelector("#party-trainer-name")?.textContent.trim();
+    if (!treinador) return;
+    if (raiz.dataset.multipokeTreinadorReposicao === treinador) return raiz.dataset.multipokeBolaReposicao;
+    try { return localStorage.getItem(`multipoke.auto-loja.compra.${treinador}.bola`); }
+    catch { /* A escolha feita no painel continua disponível nesta aba. */ }
+  }
+
+  function atualizarEstado() {
+    const bola = escolhaBolaReposicao()?.match(/^ball:(\d+)$/)?.[1];
+    let estado = "ativa";
+    if (bola) {
+      const quantidade = document.querySelector(
+        `[data-custom-select-owner="ball-select"] [data-value="${bola}"] .custom-select-quantity`,
+      )?.textContent.trim();
+      const estoque = /^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(quantidade ?? "")
+        ? Number(quantidade.replaceAll(".", "")) : NaN;
+      if (!Number.isSafeInteger(estoque)) estado = "aguardando-estoque";
+      else if (estoque === 0) estado = "sem-bolas";
+    }
+    if (raiz.dataset.multipokeAutocaptura !== estado) raiz.dataset.multipokeAutocaptura = estado;
+    return estado === "ativa";
+  }
+
   function parar() {
+    if (intervalo === null) return;
     clearInterval(intervalo);
     intervalo = null;
     delete window.multiPokeCaptura;
@@ -52,11 +78,13 @@
   }
 
   function iniciar() {
-    if (intervalo !== null) return;
+    if (intervalo !== null) {
+      atualizarEstado();
+      return;
+    }
     intervalo = setInterval(clicarSeDisponivel, 350);
     window.multiPokeCaptura = { parar };
-    raiz.dataset.multipokeAutocaptura = "ativa";
-    console.info("Autocaptura ativa. Para parar, execute multiPokeCaptura.parar().");
+    console.info("Autocaptura iniciada. Para parar, execute multiPokeCaptura.parar().");
     clicarSeDisponivel();
   }
 

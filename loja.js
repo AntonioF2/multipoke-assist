@@ -201,14 +201,18 @@
   configurarArraste(painel, campo("cabecalho"), campo("arrastar"));
   const botaoCaptura = campo("alternar-captura");
   const raiz = document.documentElement;
+  const comandoCaptura = detail => document.dispatchEvent(new CustomEvent("multipoke:autocaptura", { detail }));
   function atualizarBotaoCaptura() {
-    const ativa = raiz.dataset.multipokeAutocaptura === "ativa";
-    botaoCaptura.setAttribute("aria-pressed", String(ativa));
-    botaoCaptura.textContent = ativa ? "Autocaptura ligada" : "Autocaptura desligada";
+    const estado = raiz.dataset.multipokeAutocaptura;
+    const rotulos = {
+      ativa: "Autocaptura ligada",
+      "sem-bolas": "Autocaptura pausada · Poké Bola selecionada sem estoque",
+      "aguardando-estoque": "Autocaptura pausada · aguardando leitura do estoque",
+    };
+    botaoCaptura.setAttribute("aria-pressed", String(Object.hasOwn(rotulos, estado)));
+    botaoCaptura.textContent = rotulos[estado] ?? "Autocaptura desligada";
   }
-  botaoCaptura.addEventListener("click", () => {
-    document.dispatchEvent(new CustomEvent("multipoke:autocaptura", { detail: "alternar" }));
-  });
+  botaoCaptura.addEventListener("click", () => comandoCaptura("alternar"));
   new MutationObserver(atualizarBotaoCaptura).observe(raiz, { attributeFilter: ["data-multipoke-autocaptura"] });
   atualizarBotaoCaptura();
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
@@ -259,6 +263,11 @@
   const chaveCompra = id => `multipoke.auto-loja.compra.${treinadorConfigurado}.${id}`;
   const chavePokemon = id => `multipoke.auto-loja.pokemon.${treinadorConfigurado}.${id}`;
 
+  function publicarBolaReposicao() {
+    raiz.dataset.multipokeTreinadorReposicao = treinadorConfigurado;
+    raiz.dataset.multipokeBolaReposicao = escolhasCompra.get("bola");
+  }
+
   function carregarCompras() {
     for (const id of camposCompra) {
       const controle = campo(id);
@@ -273,6 +282,7 @@
         if (!controle.value || !controle.validity.valid) controle.value = controle.defaultValue;
       }
     }
+    publicarBolaReposicao();
   }
 
   function carregarRegras() {
@@ -449,7 +459,9 @@
       const prazo = setTimeout(() => terminar(new Error("O jogo não confirmou a operação e o estoque. Confira a loja antes de retomar.")), 6000);
       observador.observe(area, { childList: true });
       try {
-        if (!disparar()) terminar(new Error("A confirmação da loja divergiu dos itens ou valores esperados."));
+        const enviada = disparar();
+        if (enviada === null) terminar(); // Operação adiada antes de ser enviada.
+        else if (!enviada) terminar(new Error("A confirmação da loja divergiu dos itens ou valores esperados."));
       } catch (erro) { terminar(erro); }
     });
   }
@@ -460,14 +472,18 @@
     if (!item) throw new Error("O produto escolhido não aparece mais na loja.");
     if (item.estoque > regra.minimo) return;
     const custo = item.preco * regra.qtd;
-    const saldoAtual = saldo();
-    if (!Number.isSafeInteger(custo) || !Number.isSafeInteger(saldoAtual)) {
-      throw new Error(`Não foi possível verificar o custo ou o saldo para ${item.nome}.`);
+    if (!Number.isSafeInteger(custo + reserva)) {
+      throw new Error(`Não foi possível verificar o custo para ${item.nome}.`);
     }
-    if (saldoAtual - custo < reserva) {
-      const faltam = formatar(custo + reserva - saldoAtual);
-      return `A reposição de ${item.nome} requer mais ${faltam} Pokédollars para manter a reserva`;
-    }
+    const saldoInsuficiente = `Saldo insuficiente para comprar ${item.nome}`;
+    const avisoSaldo = saldoRestante => {
+      if (!Number.isSafeInteger(saldoRestante)) return `Aguardando o saldo da loja para comprar ${item.nome}`;
+      if (saldoRestante < reserva) {
+        return `${saldoInsuficiente}. Faltam ${formatar(reserva - saldoRestante)} Pokédollars contando a reserva`;
+      }
+    };
+    let aviso = avisoSaldo(saldo() - custo);
+    if (aviso) return aviso;
     const input = item.linha.querySelector("[data-shop-quantity]");
     const botao = item.linha.querySelector("[data-buy-shop]");
     if (!input || !botao) throw new Error("Os controles de compra mudaram.");
@@ -478,19 +494,30 @@
     };
     const pedido = `${formatar(regra.qtd)}× ${item.nome}`;
     await comprovante(() => {
-      alterar(String(regra.qtd));
       try {
+        alterar(String(regra.qtd));
+        const limite = numero(item.linha.querySelector("[data-shop-slider]")?.max);
+        // O jogo limita a quantidade pelo saldo real, que pode ter mudado antes de o painel atualizar.
+        if (limite < regra.qtd && input.value === String(limite)) {
+          aviso = saldoInsuficiente;
+          return null;
+        }
         if (botao.disabled || Number(input.value) !== regra.qtd || modal()) return false;
         botao.click();
-        return confirmar(modal(), "Confirmar compra", "Comprar", dialogo => {
+        const confirmada = confirmar(modal(), "Confirmar compra", "Comprar", dialogo => {
           const valores = [...dialogo.querySelectorAll(".ui-confirm__details dd")].map(no => no.textContent.trim());
-          return texto(dialogo, "p") === pedido && valores[0] === `$ ${formatar(item.preco)}` &&
-            valores[1] === `$ ${formatar(custo)}` && saldo() - custo >= reserva;
+          if (texto(dialogo, "p") !== pedido || valores[0] !== `$ ${formatar(item.preco)}` ||
+              valores[1] !== `$ ${formatar(custo)}`) return false;
+          aviso = avisoSaldo(saldo() - custo);
+          const saldoPrevisto = numero(valores[2]?.match(/^\$\s*([\d.]+)$/)?.[1]);
+          if (!aviso && Number.isSafeInteger(saldoPrevisto)) aviso = avisoSaldo(saldoPrevisto);
+          return !aviso;
         });
+        return aviso ? null : confirmada;
       } finally { if (input.isConnected) alterar(anterior); }
     }, mensagem => mensagem === `Compra concluída: ${pedido} por ${formatar(custo)} Pokédollars.`,
     () => produtos().some(atual => atual.id === item.id && atual.estoque > item.estoque));
-    return `Comprou ${pedido}`;
+    return aviso ?? `Comprou ${pedido}`;
   }
 
   async function vender(modo) {
@@ -782,6 +809,7 @@
       if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return;
       if (seletor) escolhasCompra.set(id, controle.value);
       else if (!controle.value || !controle.validity.valid) return;
+      if (id === "bola") publicarBolaReposicao();
       try { localStorage.setItem(chaveCompra(id), controle.value); }
       catch { /* A configuração continua disponível nesta aba. */ }
     });
