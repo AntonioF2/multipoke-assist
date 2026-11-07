@@ -2,7 +2,7 @@
   if (location.origin !== "https://multipoke.io" || !/^\/jogar\/?$/.test(location.pathname)) return;
   if (document.getElementById("multipoke-auto-loja")) return;
 
-  function configurarArraste(painel, alca) {
+  function configurarArraste(painel, cabecalho, faixa) {
     const chave = "multipoke.auto-loja.posicao";
     const margem = 12;
     let posicao;
@@ -31,25 +31,26 @@
       try { localStorage.setItem(chave, JSON.stringify(posicao)); } catch { /* Mantém a posição nesta aba. */ }
     }
 
-    alca.addEventListener("pointerdown", event => {
+    faixa.addEventListener("click", event => event.preventDefault());
+    faixa.addEventListener("pointerdown", event => {
       if (event.button !== 0 || !event.isPrimary || arraste) return;
       const { left, top } = painel.getBoundingClientRect();
       arraste = { id: event.pointerId, dx: event.clientX - left, dy: event.clientY - top };
-      alca.setPointerCapture(event.pointerId);
+      faixa.setPointerCapture(event.pointerId);
     });
-    alca.addEventListener("pointermove", event => {
+    faixa.addEventListener("pointermove", event => {
       if (arraste?.id !== event.pointerId) return;
       posicao = limitar(event.clientX - arraste.dx, event.clientY - arraste.dy);
       posicionar();
     });
-    alca.addEventListener("lostpointercapture", event => {
+    faixa.addEventListener("lostpointercapture", event => {
       if (arraste?.id !== event.pointerId) return;
       arraste = null;
       salvarPosicao();
     });
 
     const setas = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] };
-    alca.addEventListener("keydown", event => {
+    cabecalho.addEventListener("keydown", event => {
       if (!Object.hasOwn(setas, event.key)) return;
       event.preventDefault();
       event.stopPropagation();
@@ -68,7 +69,7 @@
   const LIMITE_LOOT = 100;
   const LIMITE_LOTE_POKEMON = 10;
   const QUALIDADE_LENDARIA = 1.70;
-  const INTERVALO = 30_000;
+  const INTERVALO_VENDA = 30_000;
   const INTERVALO_ESTOQUE = 5_000;
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
   const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
@@ -97,13 +98,17 @@
         box-shadow: 0 4px 0 #152641, 0 10px 24px #101d3340; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
       #painel[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      #painel > summary { position: sticky; top: 0; z-index: 1; display: flex; align-items: center;
-        gap: 8px; list-style: none; padding: 7px 46px 7px 10px; background: var(--vermelho);
-        border-bottom: 3px solid var(--amarelo); color: #fff; }
+      #painel > summary { position: sticky; top: 0; z-index: 1; display: flex; list-style: none;
+        background: var(--vermelho); border-bottom: 3px solid var(--amarelo); color: #fff; }
       #painel > summary::-webkit-details-marker { display: none; }
-      #painel > summary::before { content: ""; width: 6px; height: 6px; flex: 0 0 auto;
-        border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(-45deg); }
-      #painel[open] > summary::before { transform: rotate(45deg); }
+      #seta-painel { width: 32px; flex: 0 0 auto; display: grid; place-items: center; }
+      #seta-painel:hover { background: #811827; }
+      #seta-painel::before { content: ""; width: 7px; height: 7px; border: solid #fff;
+        border-width: 0 2px 2px 0; transform: rotate(-45deg); }
+      #painel[open] #seta-painel::before { transform: rotate(45deg); }
+      #arrastar { display: flex; align-items: center; flex: 1; gap: 8px; padding: 7px 12px 7px 4px;
+        cursor: grab; touch-action: none; user-select: none; }
+      #arrastar:active { cursor: grabbing; }
       #dragonite { width: 48px; height: 48px; flex: 0 0 auto; background: #fff5d6;
         border: 1px solid var(--amarelo); border-radius: 8px; object-fit: contain; image-rendering: pixelated; }
       .titulo { display: block; color: var(--amarelo); font-size: 19px; font-weight: 900;
@@ -114,10 +119,6 @@
       .regras > summary { font-weight: 700; }
       #regras-pokemon label { margin: 3px 0; }
       #pokemon-qualidade { width: 76px; }
-      #mover { position: absolute; z-index: 2; top: 18px; right: 12px; width: 28px; height: 28px;
-        border: 1px solid #fff6; border-radius: 6px; background: #811827; color: #fff;
-        font: 18px/1 system-ui, sans-serif; cursor: grab; touch-action: none; user-select: none; }
-      #mover:active { cursor: grabbing; }
       fieldset { margin: 0; padding: 0 12px; border: 0; min-width: 0; }
       fieldset > div { margin: 8px 0; }
       label { display: inline-block; }
@@ -128,7 +129,7 @@
         border: 1px solid #a6b7d0; border-radius: 5px; background: #fff; color: var(--azul); }
       select:disabled, input:disabled { background: #edf1f7; color: #5b6c87; cursor: default; }
       :is(summary, button, select, input):focus-visible { outline: 2px solid #2d61b1; outline-offset: 2px; }
-      :is(#painel > summary, #mover):focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
+      #painel > summary:focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
       #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
       .loot { display: grid; max-height: 170px; overflow: auto; }
       .loot label { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px;
@@ -142,10 +143,13 @@
       p { margin: 8px 0; }
     </style>
     <details id="painel">
-      <summary>
-        <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
-        <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48">
-        <span><span class="titulo">Auto Loja</span><span id="estado"></span></span>
+      <summary id="cabecalho" aria-label="Abrir ou recolher Auto Loja">
+        <span id="seta-painel" title="Abrir ou recolher" aria-hidden="true"></span>
+        <span id="arrastar" title="Segure e arraste para mover">
+          <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
+          <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48" draggable="false">
+          <span><span class="titulo">Auto Loja</span><span id="estado"></span></span>
+        </span>
       </summary>
       <fieldset id="config">
         <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
@@ -181,12 +185,11 @@
       </fieldset>
       <button id="alternar" type="button">Iniciar Auto Loja</button>
       <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
-    </details>
-    <button id="mover" type="button" aria-label="Mover painel Auto Loja" title="Arraste para mover ou use as setas">⠿</button>`;
+    </details>`;
   document.body.append(painel);
 
   const campo = id => interfaceLoja.getElementById(id);
-  configurarArraste(painel, campo("mover"));
+  configurarArraste(painel, campo("cabecalho"), campo("arrastar"));
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
   const tiposCompra = ["bola", "pocao"];
   const camposCompra = [...tiposCompra, "bola-min", "bola-qtd", "pocao-min", "pocao-qtd", "reserva"];
@@ -436,7 +439,14 @@
     if (!item) throw new Error("O produto escolhido não aparece mais na loja.");
     if (item.estoque > regra.minimo) return;
     const custo = item.preco * regra.qtd;
-    if (!Number.isSafeInteger(custo) || !(saldo() - custo >= reserva)) return;
+    const saldoAtual = saldo();
+    if (!Number.isSafeInteger(custo) || !Number.isSafeInteger(saldoAtual)) {
+      throw new Error(`Não foi possível verificar o custo ou o saldo para ${item.nome}.`);
+    }
+    if (saldoAtual - custo < reserva) {
+      const faltam = formatar(custo + reserva - saldoAtual);
+      return `A reposição de ${item.nome} requer mais ${faltam} Pokédollars para manter a reserva`;
+    }
     const input = item.linha.querySelector("[data-shop-quantity]");
     const botao = item.linha.querySelector("[data-buy-shop]");
     if (!input || !botao) throw new Error("Os controles de compra mudaram.");
@@ -459,7 +469,7 @@
       } finally { if (input.isConnected) alterar(anterior); }
     }, mensagem => mensagem === `Compra concluída: ${pedido} por ${formatar(custo)} Pokédollars.`,
     () => produtos().some(atual => atual.id === item.id && atual.estoque > item.estoque));
-    return pedido;
+    return `Comprou ${pedido}`;
   }
 
   async function vender(modo) {
@@ -604,29 +614,33 @@
     const continua = () => sessao === atual && treinador() === atual.treinador && cacada() &&
       inicio === interacoes && document.hasFocus() && !document.hidden && jogo("#game-shell:not([inert])");
     if (treinador() !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
-    if (!continua()) return;
+    const vendaDevida = (atual.modoVenda || atual.filtroPokemon) && Date.now() >= atual.proximaVenda;
+    if (!continua() || (!atual.compras.length && !vendaDevida)) return atualizarEstoque();
     ocupada = true;
     try {
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
         if (!lock || !continua()) return;
         await comLoja(false, async () => {
-          const realizadas = [];
+          const resultados = [];
           for (const regra of atual.compras) {
             if (!continua() || !loja() || modal()) return;
             const compra = await comprar(regra, atual.reserva);
-            if (compra) realizadas.push(`Comprou ${compra}`);
+            if (compra) resultados.push(compra);
           }
-          if (atual.modoVenda && continua() && loja() && !modal()) {
-            const venda = await vender(atual.modoVenda);
-            if (venda) realizadas.push(`Vendeu ${venda}`);
-          }
-          if (atual.filtroPokemon && continua() && loja() && !modal()) {
-            const venda = await venderPokemon(atual.filtroPokemon, continua);
-            if (venda) realizadas.push(`Vendeu ${venda}`);
+          if (vendaDevida && continua() && loja() && !modal()) {
+            atual.proximaVenda = Date.now() + INTERVALO_VENDA;
+            if (atual.modoVenda) {
+              const venda = await vender(atual.modoVenda);
+              if (venda) resultados.push(`Vendeu ${venda}`);
+            }
+            if (atual.filtroPokemon && continua() && loja() && !modal()) {
+              const venda = await venderPokemon(atual.filtroPokemon, continua);
+              if (venda) resultados.push(`Vendeu ${venda}`);
+            }
           }
           if (continua() && loja() && !modal()) {
             mostrarEstoque();
-            informar(realizadas.join(". ") || "Aguardando reposição ou itens elegíveis para venda.");
+            informar(resultados.join(" · ") || "Aguardando reposição ou itens elegíveis para venda.");
           }
         });
       });
@@ -737,14 +751,13 @@
         compras.some(regra => !inteiro(regra.minimo, 0, 10_000) || !inteiro(regra.qtd, 1, 10_000))) {
       return informar("Confira os números de estoque mínimo, quantidade e reserva.");
     }
-    sessao = { treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva };
+    sessao = { treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva, proximaVenda: 0 };
     campo("config").disabled = true;
     campo("estado").textContent = "· ativa";
     campo("alternar").textContent = "Pausar Auto Loja";
-    informar("Ativa durante a caçada. A loja é conferida a cada 30 segundos com a aba em foco.");
+    informar("Ativa durante a caçada. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
     void ciclo();
   });
 
-  setInterval(ciclo, INTERVALO);
-  setInterval(atualizarEstoque, INTERVALO_ESTOQUE);
+  setInterval(() => sessao ? ciclo() : atualizarEstoque(), INTERVALO_ESTOQUE);
 })();
