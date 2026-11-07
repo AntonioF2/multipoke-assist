@@ -146,6 +146,9 @@
   const campo = id => interfaceLoja.getElementById(id);
   configurarArraste(painel, campo("mover"));
   const informar = mensagem => { campo("mensagem").textContent = mensagem; };
+  const tiposCompra = ["bola", "pocao"];
+  const camposCompra = [...tiposCompra, "bola-min", "bola-qtd", "pocao-min", "pocao-qtd", "reserva"];
+  const escolhasCompra = new Map();
   const regrasLoot = new Map();
   let estoqueLoot = new Map();
   let catalogo;
@@ -186,6 +189,23 @@
 
   const chaveLoot = (id, nome) => `${id}:${normalizar(nome)}`;
   const chaveRegras = () => `multipoke.auto-loja.loot.${treinadorConfigurado}`;
+  const chaveCompra = id => `multipoke.auto-loja.compra.${treinadorConfigurado}.${id}`;
+
+  function carregarCompras() {
+    for (const id of camposCompra) {
+      const controle = campo(id);
+      let salvo;
+      try { salvo = localStorage.getItem(chaveCompra(id)); }
+      catch { /* Usa os valores padrão quando o armazenamento está indisponível. */ }
+      if (controle.matches("select")) {
+        escolhasCompra.set(id, salvo ?? "");
+        controle.value = "";
+      } else {
+        controle.value = salvo ?? controle.defaultValue;
+        if (!controle.value || !controle.validity.valid) controle.value = controle.defaultValue;
+      }
+    }
+  }
 
   function carregarRegras() {
     regrasLoot.clear();
@@ -227,17 +247,17 @@
 
   function mostrarEstoque() {
     const disponiveis = produtos();
-    for (const tipo of ["bola", "pocao"]) {
+    for (const tipo of tiposCompra) {
       const select = campo(tipo);
       if (interfaceLoja.activeElement === select) continue;
-      const anterior = select.value;
+      const anterior = escolhasCompra.get(tipo);
       const itens = disponiveis.filter(item => item.tipo === tipo);
       const opcoes = [...select.options].slice(1);
       if (opcoes.length !== itens.length || itens.some((item, i) => item.id !== opcoes[i].value)) {
         select.length = 1;
         for (const item of itens) select.add(new Option("", item.id));
-        if (itens.some(item => item.id === anterior)) select.value = anterior;
       }
+      if (itens.some(item => item.id === anterior)) select.value = anterior;
       for (const [i, item] of itens.entries()) {
         const rotulo = `${item.nome} · ${formatar(item.estoque)} na mochila`;
         if (select.options[i + 1].text !== rotulo) select.options[i + 1].text = rotulo;
@@ -494,9 +514,10 @@
       treinadorConfigurado = nome;
       estoqueLido = false;
       estoqueLoot.clear();
+      carregarCompras();
       carregarRegras();
       if (catalogo) mostrarCatalogo();
-      campo("bola").value = campo("pocao").value = campo("modo-venda").value = "";
+      campo("modo-venda").value = "";
     }
     if (!catalogo && Date.now() >= proximaConsultaCatalogo) {
       void carregarCatalogo().catch(() => {}).finally(mostrarCatalogo);
@@ -520,6 +541,17 @@
 
   campo("buscar-loot").addEventListener("input", mostrarCatalogo);
   campo("painel").addEventListener("toggle", atualizarEstoque);
+  for (const id of camposCompra) {
+    const controle = campo(id);
+    const seletor = controle.matches("select");
+    controle.addEventListener(seletor ? "change" : "input", () => {
+      if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return;
+      if (seletor) escolhasCompra.set(id, controle.value);
+      else if (!controle.value || !controle.validity.valid) return;
+      try { localStorage.setItem(chaveCompra(id), controle.value); }
+      catch { /* A configuração continua disponível nesta aba. */ }
+    });
+  }
   window.addEventListener("storage", event => {
     if (!treinadorConfigurado || event.key !== chaveRegras()) return;
     carregarRegras();
@@ -530,7 +562,7 @@
     if (sessao) return pausar("Auto Loja pausada.");
     if (ocupada) return;
     if (!estoqueLido || treinador() !== treinadorConfigurado) return informar("Aguarde a leitura automática do estoque.");
-    const compras = ["bola", "pocao"].map(tipo => ({
+    const compras = tiposCompra.map(tipo => ({
       id: campo(tipo).value,
       minimo: campo(`${tipo}-min`).valueAsNumber,
       qtd: campo(`${tipo}-qtd`).valueAsNumber,
