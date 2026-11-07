@@ -67,7 +67,7 @@
   }
 
   const LIMITE_LOOT = 100;
-  const LIMITE_LOTE_POKEMON = 10;
+  const LIMITE_LOTE_POKEMON = 20;
   const QUALIDADE_LENDARIA = 1.70;
   const INTERVALO_VENDA = 30_000;
   const INTERVALO_ESTOQUE = 5_000;
@@ -542,38 +542,44 @@
     const rolagem = layout.querySelector(".bag-sell-panel");
     if (!rolagem?.clientHeight) return;
     const topo = rolagem.scrollTop;
-    let marcou = false;
+    const lote = new Map();
     try {
       if (limpar() || caixas().length) throw new Error("Há Pokémon selecionados manualmente na loja. Limpe a seleção antes de retomar.");
       rolagem.scrollTop = 0;
-      let lote;
       while (continua() && loja() === layout && !modal()) {
-        lote = candidatos().slice(0, LIMITE_LOTE_POKEMON);
-        if (lote.length || rolagem.scrollTop + rolagem.clientHeight >= rolagem.scrollHeight - 1) break;
+        for (const { id } of candidatos()) {
+          if (lote.size === LIMITE_LOTE_POKEMON) break;
+          if (lote.has(id)) continue;
+          const linha = layout.querySelector(`.pokemon-sale-row[data-pokemon-id="${CSS.escape(id)}"]`);
+          const item = linha && pokemonElegivel(linha, filtro);
+          if (!item || item.caixa.checked) continue;
+          item.caixa.click();
+          lote.set(id, item);
+        }
+        if (lote.size === LIMITE_LOTE_POKEMON || rolagem.scrollTop + rolagem.clientHeight >= rolagem.scrollHeight - 1) break;
         const antes = rolagem.scrollTop;
         rolagem.scrollTop += Math.max(1, Math.floor(rolagem.clientHeight * 0.8));
         if (rolagem.scrollTop === antes) break;
         // A lista do jogo só monta no DOM os cartões próximos à área visível.
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      if (!lote?.length || !continua() || loja() !== layout || modal()) return;
-      marcou = true;
-      for (const { id } of lote) candidatos().find(item => item.id === id)?.caixa.click();
+      if (!lote.size || !continua() || loja() !== layout || modal()) return;
 
-      const itens = candidatos().filter(item => item.caixa.checked);
-      const quantidade = formatar(itens.length);
-      const preco = itens.reduce((soma, item) => soma + item.preco, 0);
+      const marcadosVisiveis = candidatos().filter(item => item.caixa.checked);
+      const quantidade = formatar(lote.size);
+      let preco = 0;
+      for (const item of lote.values()) preco += item.preco;
       const barra = layout.querySelector(".sale-selection-sticky");
       const botao = barra?.querySelector("[data-bulk-sell-sale-pokemon]:not(:disabled)");
-      const ids = new Set(lote.map(item => item.id));
-      if (itens.length !== lote.length || caixas().length !== itens.length || !itens.every(item => ids.has(item.id)) ||
+      // O resumo da loja inclui os marcados cujos cartões saíram do DOM ao rolar.
+      if (caixas().length !== marcadosVisiveis.length || !marcadosVisiveis.every(item => lote.has(item.id)) ||
           !Number.isSafeInteger(preco) || !botao || texto(barra, "strong") !== `${quantidade} selecionados no filtro` ||
           texto(barra, "small") !== `${formatar(preco)} Pokédollars`) {
         throw new Error("A seleção de Pokémon mudou antes da venda.");
       }
 
       const faixas = new Map();
-      for (const { faixa } of itens) faixas.set(faixa, (faixas.get(faixa) ?? 0) + 1);
+      for (const { faixa } of lote.values()) faixas.set(faixa, (faixas.get(faixa) ?? 0) + 1);
       const esperado = new Map([["Pokémon na venda", quantidade], ["Total", `$ ${formatar(preco)}`]]);
       for (const [faixa, quantidade] of faixas) esperado.set(faixa, formatar(quantidade));
       await comprovante(() => {
@@ -592,7 +598,7 @@
       return `${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
     } finally {
       if (continua() && loja() === layout && !modal()) {
-        if (marcou) limpar()?.click();
+        if (lote.size) limpar()?.click();
         rolagem.scrollTop = topo;
         if (abaAnterior) abaLoja(abaAnterior);
       }

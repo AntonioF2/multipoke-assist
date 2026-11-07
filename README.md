@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.1**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.2**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome
 
@@ -67,7 +67,7 @@ Nos dois modos, o loot precisa constar no catálogo como elegível, aparecer na 
 
 Com qualidade abaixo de **1,30** e IV total abaixo de **80**, o modo **E** exige os dois limites e o modo **OU** exige pelo menos um. Um Pokémon com qualidade exatamente **1,30** só pode passar pelo critério de IV. O mesmo vale para IV exatamente **80** em relação ao critério de qualidade.
 
-A extensão vende até **10 Pokémon por ciclo**. Ela usa a lista de venda da loja e respeita os filtros ativos nela. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny e Holo ficam protegidos, assim como os de qualidade **Lendária ou superior** (a partir de **1,70**). Se houver Pokémon selecionados manualmente na loja, o Auto Loja pausa antes de vender.
+A extensão vende até **20 Pokémon por venda**. Ela usa a lista de venda da loja e respeita os filtros ativos nela. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny e Holo ficam protegidos, assim como os de qualidade **Lendária ou superior** (a partir de **1,70**). Se houver Pokémon selecionados manualmente na loja, o Auto Loja pausa antes de vender.
 
 ## Quando o Auto Loja funciona
 
@@ -88,6 +88,7 @@ Se o painel não aparecer, confira se você carregou a versão completa, se a ab
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.2 | Lotes de até 20 Pokémon, com seleção ao rolar pela lista da loja. |
 | 1.5.1 | Arraste pela faixa vermelha, seta exclusiva para abrir e recolher, reposição a cada 5 segundos e aviso de saldo insuficiente. |
 | [1.5.0](https://github.com/AntonioF2/multipoke-autocaptura/commit/189564c) | Venda de Pokémon por qualidade e IV total com combinação **E** ou **OU**, proteções e lotes de até 10. |
 | [1.4.1](https://github.com/AntonioF2/multipoke-autocaptura/commit/4d5ddf1) | Sprite 2D de Dragonite de Pokémon HeartGold e SoulSilver incluído na extensão. |
