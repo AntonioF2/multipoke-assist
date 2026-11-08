@@ -124,6 +124,7 @@
         background: #edf3ff; color: var(--azul); font-weight: 700; }
       #abas button[aria-pressed="true"] { background: var(--azul); color: #fff; }
       #aba-hunts { padding: 0 12px 12px; }
+      #aba-hunts h3 { margin: 10px 0 4px; font-size: 14px; }
       .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
       #hunt-historico { white-space: pre-line; }
@@ -215,8 +216,14 @@
       <section id="aba-hunts" aria-labelledby="abrir-hunts" hidden>
         <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
         <p id="hunt-atual"></p>
-        <div class="hunt-resumo"><strong>Melhor para XP</strong><span id="hunt-melhor-xp"></span></div>
-        <div class="hunt-resumo"><strong>Melhor para drops</strong><span id="hunt-melhor-drops"></span></div>
+        <h3>Estimativas para seu nível</h3>
+        <div class="hunt-resumo"><strong>Melhor estimativa de XP</strong><span id="hunt-estimativa-xp"></span></div>
+        <div class="hunt-resumo"><strong>Melhor estimativa de drops</strong><span id="hunt-estimativa-drops"></span></div>
+        <p><small id="hunt-estimativa-status"></small></p>
+        <p><small>Encontros, multiplicadores e drops da Pokepédia. XP base de referência da PokéAPI.</small></p>
+        <h3>Ganhos medidos no jogo</h3>
+        <div class="hunt-resumo"><strong>Melhor XP/h medido</strong><span id="hunt-melhor-xp"></span></div>
+        <div class="hunt-resumo"><strong>Melhor drops/h medido</strong><span id="hunt-melhor-drops"></span></div>
         <p id="hunt-medicao" role="status"></p>
         <details class="regras">
           <summary>Histórico da mesma equipe</summary>

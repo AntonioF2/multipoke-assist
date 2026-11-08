@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.12**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.13**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -73,7 +73,11 @@ A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do 
 
 ## Análise de hunts
 
-Abra **Análise de hunts** no painel e deixe a aba da análise aberta durante a caçada. A extensão lê o Registro da Caçada do jogo e registra a hunt depois de pelo menos **5 minutos** com a mesma equipe e um abate. Se você já estava na caçada ao começar a medir, ou se trocar a equipe, a extensão começa a contagem a partir da nova leitura.
+Abra **Análise de hunts** para ver estimativas antes de testar uma hunt. A extensão verifica o nível do treinador, os níveis da equipe e o VIP, então compara até 12 hunts regulares próximas do nível da equipe, limitado pelo nível do treinador.
+
+Para XP, a análise pondera a XP base de referência de cada espécie pela sua participação nos encontros e aplica os multiplicadores da hunt. Para drops, usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. Quando existe uma medição da hunt atual, a extensão também projeta os valores por hora usando o ritmo de abates medido com a mesma formação. Esse ritmo pode mudar entre hunts. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
+
+Deixe a aba da análise aberta durante a caçada para obter uma medição real. A extensão lê o Registro da Caçada do jogo e registra a hunt depois de pelo menos **5 minutos** com a mesma equipe e um abate. Se você já estava na caçada ao começar a medir, ou se trocar a equipe, a extensão começa a contagem a partir da nova leitura.
 
 Para comparar, visite outras hunts com a mesma formação e deixe a análise registrar cada uma. O painel mostra a melhor hunt medida para **XP/h** e a melhor para **drops/h**, além do histórico local por treinador e formação. Drops/h considera o valor dos itens no registro, sem somar moedas ou capturas e sem descontar consumíveis. As taxas refletem as condições de cada medição, incluindo o nível da equipe, os bônus e o ritmo de abates.
 
@@ -146,6 +150,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.13 | Estimativas de XP e drops por abate, com seleção de hunts pelo nível do treinador e da equipe. |
 | 1.5.12 | Aba **Análise de hunts** compara XP e drops por hora medidos para a equipe ativa. |
 | 1.5.11 | Pacote e fluxo de publicação de atualizações na Chrome Web Store. |
 | 1.5.10 | A Auto Loja pede a correção de um IV incompleto antes de iniciar a venda de Pokémon. |

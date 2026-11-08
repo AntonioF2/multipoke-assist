@@ -1,8 +1,207 @@
+function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
+  const LIMITE_HUNTS = 12;
+  const TTL = 15 * 60_000;
+  const URL_XP = "https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon.csv";
+  const casasDecimais = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+  const fichas = new Map();
+  let catalogo;
+  let consulta;
+
+  const decimal = valor => /^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d+)?$/.test(valor ?? "")
+    ? Number(valor.replaceAll(".", "").replace(",", ".")) : NaN;
+
+  async function baixar(url) {
+    const resposta = await fetch(url, {
+      credentials: "omit", referrerPolicy: "no-referrer", redirect: "error",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resposta.ok) throw new Error("Fonte de dados indisponível.");
+    return resposta.text();
+  }
+
+  async function pagina(url) {
+    const modelo = document.createElement("template");
+    modelo.innerHTML = await baixar(url);
+    return modelo.content;
+  }
+
+  async function lerIndice() {
+    const indice = await pagina("/pokepedia/hunts");
+    const hunts = [];
+    for (const link of indice.querySelectorAll("a.hunt-entry[href]")) {
+      const url = link.getAttribute("href");
+      const nome = texto(link, "h2");
+      const acesso = texto(link, ".catalog-id").match(/^ACESSO · LV\. ([\d.]+) · (FREE|VIP)$/);
+      const nivel = numero(acesso?.[1]);
+      if (nome && /^\/pokepedia\/hunts\/[\w-]+$/.test(url) && Number.isSafeInteger(nivel) && nivel > 0) {
+        hunts.push({ url, nome, nivel, vip: acesso[2] === "VIP" });
+      }
+    }
+    if (!hunts.length) throw new Error("Catálogo de hunts indisponível.");
+    return hunts;
+  }
+
+  async function lerXpBase() {
+    const [cabecalho, ...linhas] = (await baixar(URL_XP)).trim().split(/\r?\n/);
+    const colunas = cabecalho.split(",");
+    const id = colunas.indexOf("id");
+    const base = colunas.indexOf("base_experience");
+    if (id < 0 || base < 0) throw new Error("Referência de XP indisponível.");
+    const xp = new Map();
+    for (const linha of linhas) {
+      const dados = linha.split(",");
+      if (/^\d+$/.test(dados[id]) && /^[1-9]\d*$/.test(dados[base])) xp.set(dados[id], Number(dados[base]));
+    }
+    return xp;
+  }
+
+  function carregarCatalogo() {
+    if (!catalogo || Date.now() >= catalogo.expira) {
+      const atual = { expira: Date.now() + TTL };
+      fichas.clear();
+      atual.promessa = Promise.all([lerIndice(), lerXpBase().catch(() => null)]).then(([hunts, xp]) => {
+        if (!xp) atual.expira = Date.now() + 60_000;
+        return { hunts, xp };
+      }).catch(erro => {
+        atual.expira = Date.now() + 60_000;
+        throw erro;
+      });
+      catalogo = atual;
+    }
+    return catalogo.promessa;
+  }
+
+  async function lerFicha(hunt) {
+    const ficha = await pagina(hunt.url);
+    const fatos = new Map([...ficha.querySelectorAll(".fact")]
+      .map(no => [texto(no, "dt"), texto(no, "dd")]));
+    const nivelMinimo = numero(fatos.get("Nível mínimo do Pokémon")?.match(/^Lv\. ([\d.]+)$/)?.[1]);
+    const fatorXp = decimal(fatos.get("XP por abate")?.match(/^×([\d.,]+)$/)?.[1]);
+    const paragrafos = [...ficha.querySelectorAll(".details-content p")].map(no => no.textContent.trim());
+    const ritmo = paragrafos.find(valor => valor.startsWith("Ritmo:"));
+    const compensacaoXp = ritmo ? decimal(ritmo.match(/Compensação por abate: XP ×([\d.]+(?:,\d+)?)/)?.[1]) : 1;
+    const renda = paragrafos.find(valor => valor.startsWith("Renda bruta média:"));
+    const drops = decimal(renda?.match(/ e ([\d.,]+) em itens comuns vendidos ao NPC\./)?.[1]);
+    const encontros = [...ficha.querySelectorAll("#encontros tbody tr")].map(linha => {
+      const url = linha.querySelector('th a[href^="/pokepedia/pokemon/"]')?.getAttribute("href");
+      const id = url?.match(/^\/pokepedia\/pokemon\/(\d+)$/)?.[1];
+      const peso = decimal(texto(linha, "td:nth-child(3)").match(/^([\d.,]+)%$/)?.[1]);
+      return { id, peso };
+    });
+    return { ...hunt, nivelMinimo, fatorXp, compensacaoXp, drops, encontros };
+  }
+
+  function fichaComCache(hunt) {
+    if (!fichas.has(hunt.url)) {
+      const promessa = lerFicha(hunt).catch(() => {
+        if (fichas.get(hunt.url) === promessa) fichas.delete(hunt.url);
+        return null;
+      });
+      fichas.set(hunt.url, promessa);
+    }
+    return fichas.get(hunt.url);
+  }
+
+  function xpPorAbate(hunt, baseXp, vip) {
+    if (!baseXp || !(hunt.fatorXp > 0) || !(hunt.compensacaoXp > 0) || !hunt.encontros.length) return NaN;
+    let total = 0;
+    let pesoTotal = 0;
+    for (const { id, peso } of hunt.encontros) {
+      const base = baseXp.get(id);
+      if (!(peso > 0) || !base) return NaN;
+      total += peso * Math.max(1, Math.round(base * hunt.fatorXp * hunt.compensacaoXp * (vip ? 1.4 : 0.7)));
+      pesoTotal += peso;
+    }
+    return total / pesoTotal;
+  }
+
+  async function classificar(nivel, niveisEquipe, vip) {
+    const { hunts, xp } = await carregarCatalogo();
+    const nivelEquipe = Math.min(...niveisEquipe);
+    const referencia = Math.min(nivel, niveisEquipe.reduce((soma, lv) => soma + lv, 0) / niveisEquipe.length);
+    const elegiveis = hunts.filter(hunt => hunt.nivel <= nivel && hunt.nivel - nivelEquipe <= 199 &&
+      (!hunt.vip || vip));
+    elegiveis.sort((a, b) => Math.abs(a.nivel - referencia) - Math.abs(b.nivel - referencia) ||
+      b.nivel - a.nivel || a.nome.localeCompare(b.nome, "pt-BR"));
+    const candidatas = elegiveis.slice(0, LIMITE_HUNTS);
+    const dados = [];
+    let falhas = 0;
+    for (let i = 0; i < candidatas.length; i += 4) {
+      const lote = await Promise.all(candidatas.slice(i, i + 4).map(fichaComCache));
+      for (const hunt of lote) {
+        if (!hunt || !Number.isSafeInteger(hunt.nivelMinimo)) {
+          falhas++;
+          continue;
+        }
+        if (hunt.nivelMinimo > nivelEquipe) continue;
+        dados.push({ ...hunt, xp: xpPorAbate(hunt, xp, vip) });
+      }
+    }
+    const melhor = campo => dados.reduce((lider, hunt) =>
+      Number.isFinite(hunt[campo]) && (!lider || hunt[campo] > lider[campo]) ? hunt : lider, null);
+    return { xp: melhor("xp"), drops: melhor("drops"), total: dados.length, elegiveis: elegiveis.length, falhas };
+  }
+
+  function apresentar(resultado, ritmo) {
+    const exibir = (id, hunt, metrica, unidade) => {
+      const valor = hunt?.[metrica];
+      const porHora = Number.isFinite(ritmo) && Number.isSafeInteger(Math.round(valor * ritmo))
+        ? ` · ~${formatar(Math.round(valor * ritmo))} ${unidade}/h ao ritmo de ${formatar(ritmo)} abates/h` : "";
+      campo(id).textContent = hunt
+        ? `${hunt.nome} · Lv. ${formatar(hunt.nivel)} · ${casasDecimais.format(valor)} ${unidade}/abate${porHora}`
+        : "Estimativa indisponível";
+    };
+    exibir("hunt-estimativa-xp", resultado.xp, "xp", "XP");
+    exibir("hunt-estimativa-drops", resultado.drops, "drops", "Pokédollars");
+    campo("hunt-estimativa-status").textContent = resultado.elegiveis
+      ? `${resultado.total} de ${resultado.elegiveis} hunts elegíveis por nível comparadas${resultado.falhas ? ` · ${resultado.falhas} fichas indisponíveis` : ""}.`
+      : "Nenhuma hunt regular elegível para este nível e esta equipe.";
+  }
+
+  return function recomendar(equipe, ritmo) {
+    const nivel = numero(texto(document, "#trainer-level-small").match(/^Lv\. ([\d.]+)$/)?.[1]);
+    const niveisEquipe = equipe?.membros.map(membro => numero(membro.nivel.match(/^Lv\. ([\d.]+)$/)?.[1]));
+    const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
+    if (!Number.isSafeInteger(nivel) || nivel < 1 || !niveisEquipe?.every(lv => Number.isSafeInteger(lv) && lv > 0)) {
+      consulta = undefined;
+      campo("hunt-estimativa-xp").textContent = "Aguardando níveis";
+      campo("hunt-estimativa-drops").textContent = "Aguardando níveis";
+      campo("hunt-estimativa-status").textContent = "Aguardando o nível do treinador e dos Pokémon ativos.";
+      return;
+    }
+
+    const chave = JSON.stringify([nivel, niveisEquipe, vip]);
+    if (consulta?.chave === chave && Date.now() < consulta.expira) {
+      consulta.ritmo = ritmo;
+      if (consulta.resultado) apresentar(consulta.resultado, ritmo);
+      return;
+    }
+    const atual = { chave, ritmo, expira: Date.now() + TTL };
+    consulta = atual;
+    campo("hunt-estimativa-xp").textContent = "Consultando...";
+    campo("hunt-estimativa-drops").textContent = "Consultando...";
+    campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
+    void classificar(nivel, niveisEquipe, vip).then(resultado => {
+      if (consulta !== atual) return;
+      atual.resultado = resultado;
+      if (resultado.falhas || !resultado.xp) atual.expira = Date.now() + 60_000;
+      apresentar(resultado, atual.ritmo);
+    }).catch(() => {
+      if (consulta !== atual) return;
+      atual.expira = Date.now() + 60_000;
+      campo("hunt-estimativa-xp").textContent = "Estimativa indisponível";
+      campo("hunt-estimativa-drops").textContent = "Estimativa indisponível";
+      campo("hunt-estimativa-status").textContent = "Não foi possível ler o catálogo. A análise tentará novamente.";
+    });
+  };
+}
+
 function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
   const MINIMO_SEGUNDOS = 300;
   const INTERVALO_LEITURA = 15_000;
   const PREFIXO = "multipoke.auto-loja.hunts.";
   const historicoTemporario = new Map();
+  const recomendar = criarRecomendadorHunts(campo, { texto, numero, formatar });
   let sessao;
 
   const visivel = () => campo("painel").open && !campo("aba-hunts").hidden;
@@ -134,10 +333,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
       hunt: cacada.hunt,
       xp: atual.base.segundos === 0 ? numero(texto(document, "#xp-per-hour")) : porHora("xp"),
       drops: porHora("drops"),
+      abatesHora: porHora("abates"),
       segundos,
       data: Date.now(),
     };
-    if (![medicao.xp, medicao.drops].every(Number.isSafeInteger)) return "Ganhos fora da faixa de leitura.";
+    if (![medicao.xp, medicao.drops, medicao.abatesHora].every(Number.isSafeInteger)) {
+      return "Ganhos fora da faixa de leitura.";
+    }
     await salvar(atual.chave, medicao);
     return `Medição atualizada · ${Math.floor(segundos / 60)} min com esta equipe.`;
   }
@@ -148,6 +350,8 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
       !primeiro || item[campo] > primeiro[campo] ? item : primeiro, null);
     const xp = melhor("xp");
     const drops = melhor("drops");
+    const ritmo = cacada && historico.find(item => item.hunt === cacada.hunt)?.abatesHora;
+    recomendar(equipe, ritmo);
     const xpOficial = numero(texto(document, "#xp-per-hour"));
     mostrar("hunt-equipe", equipe?.membros.map(membro => [membro.nome, membro.nivel].filter(Boolean).join(" ")).join(" · ")
       || "Aguardando a equipe ativa.");
