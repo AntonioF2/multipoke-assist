@@ -32,6 +32,7 @@ jobs:
           node --check autocaptura.js
           node --check combate-hunts.js
           node --check analise-hunts.js
+          node --check troca-hunts.js
           node --check loja.js
           node --check ativar.js
           node --check barra.js

@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.17**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.18**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -87,6 +87,12 @@ Deixe a aba da análise aberta durante a caçada para obter uma medição real. 
 
 Para comparar, visite outras hunts com a mesma formação e deixe a análise registrar cada uma. O painel mostra a melhor hunt medida para **XP/h** e a melhor para **drops/h**, além do histórico local por treinador e formação. Drops/h considera o valor dos itens no registro, sem somar moedas ou capturas e sem descontar consumíveis. As taxas refletem as condições de cada medição, incluindo o nível da equipe, os bônus e o ritmo de abates.
 
+## Troca de hunt
+
+Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. A comparação usa o rendimento estimado por tempo de combate para o time e os golpes atuais. Drops considera o valor de itens comuns vendidos ao NPC.
+
+A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro minuto da caçada, exige que a aba do jogo esteja em foco e respeita um intervalo de **5 minutos** entre tentativas de entrada. Pode continuar com o painel recolhido. A ativação dura até pausar, trocar de treinador ou recarregar a aba.
+
 ## Quando o Auto Loja funciona
 
 - Com o painel aberto e a aba em foco, o estoque é lido a cada **5 segundos**, quando a loja está disponível.
@@ -145,6 +151,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.18 | Aba para trocar de hunt automaticamente com prioridade de XP ou drops. |
 | 1.5.17 | Resumo curto por hunt com o ritmo e os destaques para a equipe atual. |
 | `CWS_PUBLISHER_ID` | ID do editor exibido no Painel do desenvolvedor |
 | `CWS_EXTENSION_ID` | ID do item criado na Chrome Web Store |

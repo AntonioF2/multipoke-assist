@@ -1,3 +1,7 @@
+function pontuacaoCombateHunt(hunt, metrica) {
+  return Number.isFinite(hunt?.combate?.custo) ? hunt[metrica] / hunt.combate.custo : NaN;
+}
+
 function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
   const LIMITE_HUNTS = 12;
   const TTL = 15 * 60_000;
@@ -35,7 +39,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       const acesso = texto(link, ".catalog-id").match(/^ACESSO · LV\. ([\d.]+) · (FREE|VIP)$/);
       const nivel = numero(acesso?.[1]);
       if (nome && /^\/pokepedia\/hunts\/[\w-]+$/.test(url) && Number.isSafeInteger(nivel) && nivel > 0) {
-        hunts.push({ url, nome, nivel, vip: acesso[2] === "VIP" });
+        hunts.push({ url, slug: url.split("/").at(-1), nome, nivel, vip: acesso[2] === "VIP" });
       }
     }
     if (!hunts.length) throw new Error("Catálogo de hunts indisponível.");
@@ -123,19 +127,26 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     return total / pesoTotal;
   }
 
-  async function classificar(nivel, niveisEquipe, vip, membros, golpesAtivos) {
+  async function classificar(nivel, niveisEquipe, vip, membros, golpesAtivos, slugAtual) {
     const { hunts, xp } = await carregarCatalogo();
     const nivelEquipe = Math.min(...niveisEquipe);
     const referencia = Math.min(nivel, niveisEquipe.reduce((soma, lv) => soma + lv, 0) / niveisEquipe.length);
     const elegiveis = hunts.filter(hunt => hunt.nivel <= nivel && hunt.nivel - nivelEquipe <= 199 &&
-      (!hunt.vip || vip));
+      (!hunt.vip || vip) && (!slugAtual || /^(kanto|johto|hoenn)-/.test(hunt.slug)));
     elegiveis.sort((a, b) => Math.abs(a.nivel - referencia) - Math.abs(b.nivel - referencia) ||
       b.nivel - a.nivel || a.nome.localeCompare(b.nome, "pt-BR"));
-    const candidatas = elegiveis.slice(0, LIMITE_HUNTS);
+    const candidatas = new Set(elegiveis.slice(0, LIMITE_HUNTS));
+    if (slugAtual) {
+      const maiorNivel = Math.max(...elegiveis.map(hunt => hunt.nivel));
+      for (const hunt of elegiveis) {
+        if (hunt.slug === slugAtual || hunt.nivel === maiorNivel) candidatas.add(hunt);
+      }
+    }
+    const selecionadas = [...candidatas];
     const dados = [];
     let falhas = 0;
-    for (let i = 0; i < candidatas.length; i += 4) {
-      const lote = await Promise.all(candidatas.slice(i, i + 4).map(fichaComCache));
+    for (let i = 0; i < selecionadas.length; i += 4) {
+      const lote = await Promise.all(selecionadas.slice(i, i + 4).map(fichaComCache));
       for (const hunt of lote) {
         if (!hunt || !Number.isSafeInteger(hunt.nivelMinimo)) {
           falhas++;
@@ -164,7 +175,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     const fatorHora = Number.isFinite(referencia?.combate.custo) && medicao.abatesHora > 0
       ? referencia.combate.custo * medicao.abatesHora : NaN;
     const candidatas = comCombate ? comparadas : dados;
-    const pontuar = (hunt, metrica) => comCombate ? hunt[metrica] / hunt.combate.custo : hunt[metrica];
+    const pontuar = (hunt, metrica) => comCombate ? pontuacaoCombateHunt(hunt, metrica) : hunt[metrica];
     const melhor = metrica => candidatas.reduce((lider, hunt) => {
       const pontos = pontuar(hunt, metrica);
       return Number.isFinite(pontos) && (!comCombate || Number.isFinite(hunt.combate.custo)) &&
@@ -209,7 +220,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     if (lista.textContent !== comparacao) lista.textContent = comparacao;
   }
 
-  return function recomendar(equipe, golpesAtivos, medicao) {
+  return function recomendar(equipe, golpesAtivos, medicao, slugAtual) {
     const nivel = numero(texto(document, "#trainer-level-small").match(/^Lv\. ([\d.]+)$/)?.[1]);
     const niveisEquipe = equipe?.membros.map(membro => numero(membro.nivel.match(/^Lv\. ([\d.]+)$/)?.[1]));
     const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
@@ -222,11 +233,11 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       return;
     }
 
-    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, vip, golpesAtivos]);
+    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, vip, golpesAtivos, slugAtual]);
     if (consulta?.chave === chave && Date.now() < consulta.expira) {
       consulta.medicao = medicao;
       if (consulta.resultado) apresentar(consulta.resultado, medicao);
-      return;
+      return consulta.resultado?.dados;
     }
     const atual = { chave, medicao, expira: Date.now() + TTL };
     consulta = atual;
@@ -234,7 +245,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     campo("hunt-estimativa-drops").textContent = "Consultando...";
     campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
     campo("hunt-comparacao").textContent = "Consultando as fichas de combate...";
-    void classificar(nivel, niveisEquipe, vip, equipe.membros, golpesAtivos).then(resultado => {
+    void classificar(nivel, niveisEquipe, vip, equipe.membros, golpesAtivos, slugAtual).then(resultado => {
       if (consulta !== atual) return;
       atual.resultado = resultado;
       if (resultado.falhas || resultado.dados.some(hunt => !hunt.combate || !Number.isFinite(hunt.xp))) {
@@ -252,7 +263,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
   };
 }
 
-function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
+function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts }) {
   const MINIMO_SEGUNDOS = 300;
   const INTERVALO_LEITURA = 15_000;
   const PREFIXO = "multipoke.auto-loja.hunts.";
@@ -293,7 +304,8 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     const abates = numero(texto(document, "#kill-count"));
     if ((!partes.length && relogio !== "menos de 1 segundo") ||
         !Number.isSafeInteger(segundos) || !Number.isSafeInteger(abates)) return;
-    return { hunt, segundos, abates };
+    const slug = cabecalho.querySelector("#hunt-header-encounters [data-hunt-context]")?.dataset.huntContext;
+    return { hunt, slug, segundos, abates };
   }
 
   function acompanhar(equipe, cacada) {
@@ -403,14 +415,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     return `Medição atualizada · ${Math.floor(segundos / 60)} min com esta equipe.`;
   }
 
-  function apresentar(equipe, cacada, golpesAtivos, perfil) {
+  function apresentar(equipe, cacada, perfil) {
     const historico = equipe ? lerHistorico(equipe.chave) : [];
     const melhor = campo => historico.reduce((primeiro, item) =>
       !primeiro || item[campo] > primeiro[campo] ? item : primeiro, null);
     const xp = melhor("xp");
     const drops = melhor("drops");
     const referencia = cacada && perfil && historico.find(item => item.hunt === cacada.hunt && item.perfil === perfil);
-    recomendar(equipe, golpesAtivos, referencia);
     const xpOficial = numero(texto(document, "#xp-per-hour"));
     mostrar("hunt-equipe", equipe?.membros.map(membro => [membro.nome, membro.nivel].filter(Boolean).join(" ")).join(" · ")
       || "Aguardando a equipe ativa.");
@@ -422,16 +433,31 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     mostrar("hunt-historico", historico.length
       ? historico.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min`).join("\n")
       : "Ainda sem hunts medidas com esta formação.");
+    return referencia;
   }
 
   async function atualizar() {
     const equipe = equipeAtual();
     const cacada = lerCacada();
     acompanhar(equipe, cacada);
-    if (!visivel()) return;
+    const mostraAnalise = visivel();
+    const trocaAtiva = trocaHunts.ativa();
+    if (!mostraAnalise && !trocaAtiva) return;
     const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
     const perfil = golpesAtivos.length && golpesAtivos.every(Boolean) ? JSON.stringify(golpesAtivos) : null;
-    apresentar(equipe, cacada, golpesAtivos, perfil);
+    const referencia = mostraAnalise && apresentar(equipe, cacada, perfil);
+    const slugAtual = trocaAtiva ? cacada?.slug : undefined;
+    const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual) : undefined;
+    if (trocaAtiva) {
+      const contexto = (time, golpes) => JSON.stringify([time, golpes, texto(document, "#trainer-level-small"),
+        document.getElementById("trainer-vip-status")?.dataset.active]);
+      const inicial = contexto(equipe, golpesAtivos);
+      void trocaHunts.atualizar(dados, cacada, treinador(), () => {
+        const time = equipeAtual();
+        return lerCacada()?.slug === slugAtual && contexto(time, time ? lerGolpesHunts(time.membros) : []) === inicial;
+      });
+    }
+    if (!mostraAnalise) return;
     const atual = sessao;
     if (!atual) return mostrar("hunt-medicao", "Aguardando uma caçada com a equipe ativa.");
     mostrar("hunt-medicao", atual.mensagem || "Aguardando a primeira leitura desta equipe.");
@@ -447,7 +473,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     catch { atual.mensagem = "Não foi possível salvar a medição desta caçada."; }
     if (sessao === atual && visivel()) {
       mostrar("hunt-medicao", atual.mensagem);
-      apresentar(equipe, cacada, golpesAtivos, perfil);
+      recomendar(equipe, golpesAtivos, apresentar(equipe, cacada, perfil), slugAtual);
     }
   }
 

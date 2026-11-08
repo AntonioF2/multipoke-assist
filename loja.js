@@ -127,7 +127,9 @@
       #abas button { flex: 1; border: 1px solid #a6b7d0; border-radius: 6px; padding: 5px 6px;
         background: #edf3ff; color: var(--azul); font-weight: 700; }
       #abas button[aria-pressed="true"] { background: var(--azul); color: #fff; }
-      #aba-hunts { padding: 0 12px 12px; }
+      #aba-hunts, #aba-troca { padding: 0 12px 12px; }
+      #aba-troca label { display: block; margin: 7px 0; }
+      #troca-minimo { width: 64px; }
       #aba-hunts h3 { margin: 10px 0 4px; font-size: 14px; }
       .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
@@ -180,6 +182,7 @@
       <div id="abas" role="group" aria-label="Seções da Auto Loja">
         <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
         <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false">Análise de hunts</button>
+        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false">Troca de hunt</button>
       </div>
       <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
@@ -240,20 +243,32 @@
         </details>
         <p><small>Deixe a análise aberta durante a caçada. A comparação usa medições de pelo menos 5 minutos. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
+      <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
+        <p>Troque de hunt quando outra área disponível render mais para a equipe atual.</p>
+        <label>Prioridade <select id="troca-objetivo">
+          <option value="xp">XP</option>
+          <option value="drops">Valor dos drops</option>
+        </select></label>
+        <label>Melhoria mínima <input id="troca-minimo" type="number" min="1" max="100" step="1" value="10" required> %</label>
+        <button id="troca-alternar" type="button">Iniciar troca automática</button>
+        <p id="troca-status" role="status">Troca automática desligada.</p>
+        <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
+      </section>
     </details>`;
   document.body.append(painel);
 
   const campo = id => interfaceLoja.getElementById(id);
-  const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar });
-  for (const aba of ["loja", "hunts"]) {
+  const trocaHunts = criarTrocaHunts(campo, { formatar, treinador, podeInteragir: () => !ocupada });
+  const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts });
+  const abas = ["loja", "hunts", "troca"];
+  for (const aba of abas) {
     campo(`abrir-${aba}`).addEventListener("click", () => {
-      const hunts = aba === "hunts";
-      campo("abrir-loja").setAttribute("aria-pressed", String(!hunts));
-      campo("abrir-hunts").setAttribute("aria-pressed", String(hunts));
-      campo("aba-loja").hidden = hunts;
-      campo("aba-hunts").hidden = !hunts;
-      if (hunts) void atualizarAnalise();
-      else void atualizarEstoque();
+      for (const nome of abas) {
+        campo(`abrir-${nome}`).setAttribute("aria-pressed", String(nome === aba));
+        campo(`aba-${nome}`).hidden = nome !== aba;
+      }
+      if (aba === "loja") void atualizarEstoque();
+      else void atualizarAnalise();
     });
   }
   configurarArraste(painel, campo("cabecalho"), campo("arrastar"));
@@ -797,7 +812,7 @@
 
   async function ciclo() {
     const atual = sessao;
-    if (!atual || ocupada || !document.hasFocus() || document.hidden) return;
+    if (!atual || ocupada || trocaHunts.emTroca() || !document.hasFocus() || document.hidden) return;
     const inicio = interacoes;
     const continua = () => sessao === atual && treinador() === atual.treinador &&
       inicio === interacoes && document.hasFocus() && !document.hidden && jogo("#game-shell:not([inert])");
@@ -843,7 +858,7 @@
   }
 
   async function atualizarEstoque() {
-    if (!campo("painel").open || campo("aba-loja").hidden || ocupada || document.hidden || !document.hasFocus() ||
+    if (!campo("painel").open || campo("aba-loja").hidden || ocupada || trocaHunts.emTroca() || document.hidden || !document.hasFocus() ||
         !jogo("#game-shell:not([inert])")) return;
     const nome = treinador();
     if (!nome) return;
@@ -887,7 +902,7 @@
   campo("buscar-loot").addEventListener("input", mostrarCatalogo);
   campo("modo-venda").addEventListener("change", mostrarCatalogo);
   campo("painel").addEventListener("toggle", () => {
-    if (campo("aba-hunts").hidden) void atualizarEstoque();
+    if (!campo("aba-loja").hidden) void atualizarEstoque();
     else void atualizarAnalise();
   });
   for (const id of camposCompra) {
