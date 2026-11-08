@@ -66,7 +66,7 @@
     posicionar();
   }
 
-  const LIMITE_LOOT = 100;
+  const LIMITE_LOOT = 10_000;
   const LIMITE_LOTE_POKEMON = 20;
   const QUALIDADE_LENDARIA = 1.70;
   const INTERVALO_VENDA = 30_000;
@@ -136,10 +136,11 @@
       #painel > summary:focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
       #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
       .loot { display: grid; max-height: 170px; overflow: auto; }
-      .regra-loot { padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
-      .regra-loot label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; }
-      .permitir-loot { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-      .permitir-loot input { min-height: 0; margin: 0; }
+      .regra-loot { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px;
+        padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
+      .controles-loot { display: grid; gap: 4px; }
+      .controles-loot label { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .controles-loot input { min-height: 0; margin: 0; }
       .loot small { display: block; color: #445b7d; }
       #alternar, #alternar-captura { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
         border-radius: 7px; font-weight: 800; }
@@ -173,7 +174,7 @@
         <div><label>Venda automática <select id="modo-venda">
             <option value="">Desligada</option>
             <option value="marcados">Somente marcados para venda</option>
-            <option value="baratos">Loot barato e itens marcados</option>
+            <option value="baratos">Abaixo de 10.000 e itens marcados</option>
           </select></label>
           <details id="regras-loot" class="regras">
             <summary>Regras de loot</summary>
@@ -360,18 +361,17 @@
     if (Number.isFinite(item.preco)) partes.push(`${formatar(item.preco)} por unidade`);
     if (estoque) partes.push(`${formatar(estoque)} na loja`);
     if (!item.vendavel) partes.push("indisponível para venda automática");
-    else if (item.preco > LIMITE_LOOT) partes.push("exige permissão explícita");
+    else if (item.preco >= LIMITE_LOOT) partes.push("exige permissão explícita");
     rotulo.textContent = partes.join(" · ");
   }
 
   function lootPermitido(chave, modo, precoAtual) {
     const item = catalogo?.get(chave);
-    if (!item?.vendavel) return false;
     const regra = regrasLoot.get(chave);
+    if (!item?.vendavel || regra === "proteger") return false;
     if (regra === "vender-acima-do-limite") return true;
-    // As autorizações antigas continuam limitadas a loot barato.
-    const barato = item.preco <= LIMITE_LOOT && (precoAtual ?? item.preco) <= LIMITE_LOOT;
-    return barato && (regra === "vender" || (modo === "baratos" && regra !== "proteger"));
+    const abaixoDoLimite = item.preco < LIMITE_LOOT && (precoAtual ?? item.preco) < LIMITE_LOOT;
+    return abaixoDoLimite && (regra === "vender" || modo === "baratos");
   }
 
   function mostrarCatalogo() {
@@ -382,30 +382,28 @@
       return;
     }
     const busca = normalizar(campo("buscar-loot").value.trim()).replace(/^#/, "");
-    const modo = campo("modo-venda").value;
+    const modo = campo("modo-venda").value || "baratos";
     for (const [chave, item] of catalogo) {
       if (!normalizar(item.nome).includes(busca) && !item.id.includes(busca)) continue;
       const linha = document.createElement("div");
       linha.className = "regra-loot";
-      const label = document.createElement("label");
       const nome = document.createElement("span");
       const rotulo = document.createElement("small");
       rotulo.dataset.estoqueLoot = chave;
       atualizarRotuloLoot(rotulo);
       nome.append(item.nome, rotulo);
-      const controle = document.createElement("span");
-      controle.className = "permitir-loot";
-      const caixa = document.createElement("input");
-      caixa.type = "checkbox";
-      caixa.disabled = !item.vendavel;
-      caixa.setAttribute("aria-label", `Permitir venda de ${item.nome} #${item.id}`);
-      const padrao = document.createElement("button");
-      padrao.type = "button";
-      padrao.textContent = "Usar padrão";
-      padrao.setAttribute("aria-label", `Usar regra padrão para ${item.nome} #${item.id}`);
+      const controles = document.createElement("span");
+      controles.className = "controles-loot";
+      controles.innerHTML = `
+        <label><input type="checkbox">Permitir venda</label>
+        <label><input type="checkbox">Bloquear venda</label>`;
+      const [permitir, bloquear] = controles.querySelectorAll("input");
+      permitir.disabled = bloquear.disabled = !item.vendavel;
+      permitir.setAttribute("aria-label", `Permitir venda de ${item.nome} #${item.id}`);
+      bloquear.setAttribute("aria-label", `Bloquear venda de ${item.nome} #${item.id}`);
       const atualizar = () => {
-        caixa.checked = lootPermitido(chave, modo);
-        padrao.hidden = !item.vendavel || !regrasLoot.has(chave);
+        permitir.checked = lootPermitido(chave, modo);
+        bloquear.checked = regrasLoot.get(chave) === "proteger";
       };
       const salvar = regra => {
         if (item.vendavel && treinador() === treinadorConfigurado) {
@@ -416,16 +414,11 @@
         }
         atualizar();
       };
-      const regraVenda = item.preco > LIMITE_LOOT ? "vender-acima-do-limite" : "vender";
-      caixa.addEventListener("change", () => salvar(caixa.checked ? regraVenda : "proteger"));
-      padrao.addEventListener("click", () => {
-        salvar("");
-        caixa.focus();
-      });
+      const regraVenda = item.preco >= LIMITE_LOOT ? "vender-acima-do-limite" : "vender";
+      permitir.addEventListener("change", () => salvar(permitir.checked ? regraVenda : "proteger"));
+      bloquear.addEventListener("change", () => salvar(bloquear.checked ? "proteger" : ""));
       atualizar();
-      controle.append(caixa, "Permitir venda");
-      label.append(nome, controle);
-      linha.append(label, padrao);
+      linha.append(nome, controles);
       lista.append(linha);
     }
     if (!lista.childElementCount) lista.textContent = "Nenhum loot corresponde à busca.";
