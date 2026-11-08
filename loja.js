@@ -550,16 +550,22 @@
   async function vender(modo) {
     abaLoja("loot");
     const permitido = item => item && lootPermitido(item.chave, modo, item.preco);
-    const alvo = pilhas().filter(permitido);
-    if (!alvo.length) return;
-    if (caixasLoot().some(caixa => caixa.checked)) throw new Error("Há uma seleção manual de loot na loja. Limpe-a antes de retomar.");
+    const alvo = new Set(pilhas().filter(permitido).map(item => item.chave));
+    if (!alvo.size) return;
+
+    const limpar = () => loja()?.querySelector("[data-clear-loot-selection]:not(:disabled)");
+    limpar()?.click();
+    if (!loja() || modal() || limpar() || caixasLoot().some(caixa => caixa.checked)) {
+      throw new Error("Não foi possível limpar a seleção de loot antes da venda.");
+    }
 
     const inicio = interacoes;
     try {
-      for (const { chave } of alvo) pilhas().find(item => item.chave === chave)?.caixa.click();
-      const marcado = caixasLoot().filter(caixa => caixa.checked);
-      const itens = marcado.map(pilha);
-      if (itens.length !== alvo.length || !itens.every(permitido)) {
+      for (const chave of alvo) pilhas().find(item => item.chave === chave)?.caixa.click();
+      const itens = caixasLoot().filter(caixa => caixa.checked).map(pilha);
+      const marcados = new Set(itens.map(item => item?.chave));
+      if (itens.length !== alvo.size || !itens.every(permitido) ||
+          ![...alvo].every(chave => marcados.has(chave))) {
         throw new Error("A seleção da loja mudou antes da venda.");
       }
       const total = itens.reduce((soma, item) => soma + item.qtd * item.preco, 0);
@@ -581,7 +587,7 @@
       () => itens.every(item => !pilhas().some(atual => atual.chave === item.chave && atual.estoque >= item.estoque)));
       return `${formatar(quantidade)} loots por ${formatar(total)} Pokédollars`;
     } finally {
-      if (inicio === interacoes && loja() && !modal()) loja().querySelector("[data-clear-loot-selection]:not(:disabled)")?.click();
+      if (inicio === interacoes && !modal()) limpar()?.click();
     }
   }
 
