@@ -1,6 +1,6 @@
 # Privacidade da extensão MultiPoke Autocaptura
 
-A extensão atua no site `multipoke.io`. Ela lê a interface do jogo para identificar o treinador, verificar estoque e saldo, aplicar os filtros de venda e usar os controles de captura, compra e venda. O menu do ícone localiza a aba do MultiPoke e permite mostrar ou ocultar o painel.
+A extensão atua no site `multipoke.io`. Ela lê a interface do jogo para identificar o treinador, verificar estoque e saldo, aplicar os filtros de venda e usar os controles de captura, compra e venda. Clicar no ícone da extensão na aba do jogo mostra ou oculta o painel.
 
 A posição e a visibilidade do painel, as preferências de compra e venda, os filtros de Pokémon e as medições de hunts ficam no armazenamento local do site, no seu navegador. As regras de compra e venda são associadas ao nome do treinador. A análise salva o nome da caçada, duração, XP/h e valor dos drops/h por treinador e formação, identificada pelos Pokémon ativos. Você pode remover esses registros ao limpar os dados de `multipoke.io` no Chrome.
 

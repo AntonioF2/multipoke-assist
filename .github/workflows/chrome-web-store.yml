@@ -33,6 +33,7 @@ jobs:
           node --check analise-hunts.js
           node --check loja.js
           node --check ativar.js
+          node --check barra.js
           python3 scripts/chrome_web_store.py package multipoke-autocaptura.zip
 
       - name: Disponibilizar o ZIP

@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.14**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.15**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -26,9 +26,9 @@ git clone https://github.com/AntonioF2/multipoke-autocaptura.git
 3. Clique na **seta** para expandir ou recolher o painel. Segure e arraste a **faixa vermelha** para mover a janela. Com o cabeçalho em foco, as setas do teclado também movem o painel. A posição fica salva no navegador.
 4. Configure as compras e vendas desejadas e clique em **Iniciar Auto Loja**. **Pausar Auto Loja** interrompe as operações e libera os campos para edição.
 
-No menu do ícone **MultiPoke Autocaptura**, use **Ocultar painel** ou **Mostrar painel**. A escolha vale para as abas do MultiPoke nesse perfil do Chrome e fica salva após recarregar. A Autocaptura e a Auto Loja seguem com as operações já ativadas enquanto o painel está oculto.
+Com a aba do jogo aberta, clique no ícone **MultiPoke Autocaptura** na barra do Chrome para ocultar o painel. Clique novamente para exibi-lo. Você pode fixar o ícone na barra pelo menu de extensões do Chrome. A escolha vale para as abas do MultiPoke nesse perfil do Chrome e fica salva após recarregar. A Autocaptura e a Auto Loja seguem com as operações já ativadas enquanto o painel está oculto.
 
-Para ativar a captura manualmente, escolha **Ligar Autocaptura** no mesmo menu. No Windows, você também pode executar `Ativar Autocaptura.bat` depois de instalar a extensão.
+Para ativar a captura manualmente, use o botão roxo no painel. No Windows, você também pode executar `Ativar Autocaptura.bat` depois de instalar a extensão.
 
 ## Autocaptura
 
@@ -152,6 +152,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.15 | Um clique no ícone da barra do Chrome alterna a visibilidade do painel Auto Loja. |
 | 1.5.14 | Menu no ícone da extensão para mostrar ou ocultar o painel Auto Loja. |
 | 1.5.13 | Estimativas de XP e drops por abate, com seleção de hunts pelo nível do treinador e da equipe. |
 | 1.5.12 | Aba **Análise de hunts** compara XP e drops por hora medidos para a equipe ativa. |

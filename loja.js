@@ -238,16 +238,6 @@
     </details>`;
   document.body.append(painel);
 
-  chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
-    if (remetente.id !== chrome.runtime.id || mensagem?.tipo !== "multipoke:visibilidade-painel") return;
-    if (mensagem.alternar === true) {
-      painel.hidden = !painel.hidden;
-      try { localStorage.setItem(chavePainel, String(painel.hidden)); }
-      catch { /* A escolha continua disponível nesta aba. */ }
-    }
-    responder({ visivel: !painel.hidden });
-  });
-
   const campo = id => interfaceLoja.getElementById(id);
   const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar });
   for (const aba of ["loja", "hunts"]) {
