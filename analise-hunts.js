@@ -24,6 +24,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     modelo.innerHTML = await baixar(url);
     return modelo.content;
   }
+  const combate = criarModeloCombateHunts(pagina, { texto, decimal, numero });
 
   async function lerIndice() {
     const indice = await pagina("/pokepedia/hunts");
@@ -59,6 +60,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     if (!catalogo || Date.now() >= catalogo.expira) {
       const atual = { expira: Date.now() + TTL };
       fichas.clear();
+      combate.limparCache();
       atual.promessa = Promise.all([lerIndice(), lerXpBase().catch(() => null)]).then(([hunts, xp]) => {
         if (!xp) atual.expira = Date.now() + 60_000;
         return { hunts, xp };
@@ -80,15 +82,21 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     const paragrafos = [...ficha.querySelectorAll(".details-content p")].map(no => no.textContent.trim());
     const ritmo = paragrafos.find(valor => valor.startsWith("Ritmo:"));
     const compensacaoXp = ritmo ? decimal(ritmo.match(/Compensação por abate: XP ×([\d.]+(?:,\d+)?)/)?.[1]) : 1;
+    const ritmoPassos = decimal(ritmo?.match(/duração ×([\d.,]+)/)?.[1]) || 1;
+    const pressao = decimal(paragrafos.find(valor => valor.startsWith("Pressão de ataque dos selvagens:"))
+      ?.match(/×([\d.,]+)/)?.[1]) || 1;
     const renda = paragrafos.find(valor => valor.startsWith("Renda bruta média:"));
     const drops = decimal(renda?.match(/ e ([\d.,]+) em itens comuns vendidos ao NPC\./)?.[1]);
     const encontros = [...ficha.querySelectorAll("#encontros tbody tr")].map(linha => {
       const url = linha.querySelector('th a[href^="/pokepedia/pokemon/"]')?.getAttribute("href");
       const id = url?.match(/^\/pokepedia\/pokemon\/(\d+)$/)?.[1];
       const peso = decimal(texto(linha, "td:nth-child(3)").match(/^([\d.,]+)%$/)?.[1]);
-      return { id, peso };
+      const faixa = texto(linha, "td:nth-child(2)").match(/^(?:Lv\. )?([\d.]+)(?:\s*[–—-]\s*([\d.]+))?$/);
+      const minimo = numero(faixa?.[1]);
+      const maximo = numero(faixa?.[2] ?? faixa?.[1]);
+      return { id, peso, minimo, maximo };
     });
-    return { ...hunt, nivelMinimo, fatorXp, compensacaoXp, drops, encontros };
+    return { ...hunt, nivelMinimo, fatorXp, compensacaoXp, drops, encontros, ritmo: ritmoPassos, pressao };
   }
 
   function fichaComCache(hunt) {
@@ -115,7 +123,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     return total / pesoTotal;
   }
 
-  async function classificar(nivel, niveisEquipe, vip) {
+  async function classificar(nivel, niveisEquipe, vip, membros, golpesAtivos) {
     const { hunts, xp } = await carregarCatalogo();
     const nivelEquipe = Math.min(...niveisEquipe);
     const referencia = Math.min(nivel, niveisEquipe.reduce((soma, lv) => soma + lv, 0) / niveisEquipe.length);
@@ -137,28 +145,78 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
         dados.push({ ...hunt, xp: xpPorAbate(hunt, xp, vip) });
       }
     }
-    const melhor = campo => dados.reduce((lider, hunt) =>
-      Number.isFinite(hunt[campo]) && (!lider || hunt[campo] > lider[campo]) ? hunt : lider, null);
-    return { xp: melhor("xp"), drops: melhor("drops"), total: dados.length, elegiveis: elegiveis.length, falhas };
+    const equipe = dados.length && await combate.carregarEquipe(membros, niveisEquipe, golpesAtivos);
+    if (equipe) {
+      for (let i = 0; i < dados.length; i += 2) {
+        await Promise.all(dados.slice(i, i + 2).map(async hunt => {
+          hunt.combate = await combate.comparar(hunt, equipe);
+        }));
+      }
+    }
+    return { dados, equipe, elegiveis: elegiveis.length, falhas };
   }
 
-  function apresentar(resultado, ritmo) {
+  function apresentar(resultado, medicao) {
+    const { dados, equipe, elegiveis, falhas } = resultado;
+    const comparadas = dados.filter(hunt => hunt.combate);
+    const comCombate = comparadas.length > 0;
+    const referencia = comparadas.find(hunt => nomeCombateHunts(hunt.nome) === nomeCombateHunts(medicao?.hunt ?? ""));
+    const fatorHora = Number.isFinite(referencia?.combate.custo) && medicao.abatesHora > 0
+      ? referencia.combate.custo * medicao.abatesHora : NaN;
+    const candidatas = comCombate ? comparadas : dados;
+    const pontuar = (hunt, metrica) => comCombate ? hunt[metrica] / hunt.combate.custo : hunt[metrica];
+    const melhor = metrica => candidatas.reduce((lider, hunt) => {
+      const pontos = pontuar(hunt, metrica);
+      return Number.isFinite(pontos) && (!comCombate || Number.isFinite(hunt.combate.custo)) &&
+        (!lider || pontos > pontuar(lider, metrica)) ? hunt : lider;
+    }, null);
+    const porHora = (hunt, metrica, unidade) => {
+      const valor = Math.round(pontuar(hunt, metrica) * fatorHora);
+      return Number.isSafeInteger(valor) ? ` · ~${formatar(valor)} ${unidade}/h` : "";
+    };
     const exibir = (id, hunt, metrica, unidade) => {
-      const valor = hunt?.[metrica];
-      const porHora = Number.isFinite(ritmo) && Number.isSafeInteger(Math.round(valor * ritmo))
-        ? ` · ~${formatar(Math.round(valor * ritmo))} ${unidade}/h ao ritmo de ${formatar(ritmo)} abates/h` : "";
       campo(id).textContent = hunt
-        ? `${hunt.nome} · Lv. ${formatar(hunt.nivel)} · ${casasDecimais.format(valor)} ${unidade}/abate${porHora}`
+        ? `${hunt.nome} · Lv. ${formatar(hunt.nivel)} · ${casasDecimais.format(hunt[metrica])} ${unidade}/abate${porHora(hunt, metrica, unidade)}`
         : "Estimativa indisponível";
     };
-    exibir("hunt-estimativa-xp", resultado.xp, "xp", "XP");
-    exibir("hunt-estimativa-drops", resultado.drops, "drops", "Pokédollars");
-    campo("hunt-estimativa-status").textContent = resultado.elegiveis
-      ? `${resultado.total} de ${resultado.elegiveis} hunts elegíveis por nível comparadas${resultado.falhas ? ` · ${resultado.falhas} fichas indisponíveis` : ""}.`
+    exibir("hunt-estimativa-xp", melhor("xp"), "xp", "XP");
+    exibir("hunt-estimativa-drops", melhor("drops"), "drops", "Pokédollars");
+    const metodo = comCombate
+      ? `${comparadas.length} com comparação de combate${Number.isFinite(fatorHora) ? " e ritmo calibrado" : " e ritmo relativo"}`
+      : "classificação por abate enquanto faltam dados de combate";
+    campo("hunt-estimativa-status").textContent = elegiveis
+      ? `${dados.length} de ${elegiveis} hunts elegíveis por nível comparadas · ${metodo}${falhas ? ` · ${falhas} fichas indisponíveis` : ""}.`
       : "Nenhuma hunt regular elegível para este nível e esta equipe.";
+    const nomesGolpes = golpes => golpes.map(golpe => `${golpe.nome} (${golpe.rotuloTipo})`).join(", ");
+    campo("hunt-golpes-equipe").textContent = equipe
+      ? equipe.map(membro => `${membro.nome} (${membro.rotuloTipos}) · ${nomesGolpes(membro.golpes) || "sem golpes ativos"}`).join("\n")
+      : "Aguardando a leitura da barra de habilidades e dos golpes de dano direto da equipe.";
+    const valorBase = (valor, unidade) => Number.isFinite(valor)
+      ? `${casasDecimais.format(valor)} ${unidade}/abate` : `${unidade} indisponível`;
+    const custos = comparadas.map(hunt => hunt.combate.custo).filter(Number.isFinite);
+    const maisRapida = Math.min(...custos);
+    const comparacao = dados.map(hunt => {
+      const resumo = `${hunt.nome} (Lv. ${formatar(hunt.nivel)}) · ${valorBase(hunt.xp, "XP")} · ${valorBase(hunt.drops, "$")}`;
+      if (!hunt.combate) return `${resumo}\nCombate indisponível.`;
+      const custo = hunt.combate.custo;
+      const ritmo = Number.isFinite(custo)
+        ? Number.isFinite(fatorHora)
+          ? `~${formatar(Math.round(fatorHora / custo))} abates/h${porHora(hunt, "xp", "XP")}${porHora(hunt, "drops", "$")}`
+          : `ritmo relativo ${formatar(Math.round(100 * maisRapida / custo))}% da mais rápida`
+        : "Sem golpe de poder fixo eficaz contra pelo menos uma espécie";
+      const detalhes = hunt.combate.encontros.map(({ nome, rotuloTipos, nivel, peso, golpes, melhor, ameaca }) => {
+        const descricao = golpe => `${golpe.nome} → ${golpe.pokemon} ×${casasDecimais.format(golpe.fator)}`;
+        const ataque = melhor ? `; time: ${melhor.pokemon} usa ${melhor.nome} ×${casasDecimais.format(melhor.fator)}` : "";
+        const risco = ameaca ? `; ameaça: ${descricao(ameaca)}` : "";
+        return `${nome} (${rotuloTipos}, Lv. ~${formatar(nivel)}, ${casasDecimais.format(peso)}%) · ${nomesGolpes(golpes) || "sem golpes desbloqueados"}${ataque}${risco}`;
+      });
+      return [`${resumo} · ${ritmo}`, ...detalhes].join("\n");
+    }).join("\n\n") || "Aguardando hunts para comparar.";
+    const lista = campo("hunt-comparacao");
+    if (lista.textContent !== comparacao) lista.textContent = comparacao;
   }
 
-  return function recomendar(equipe, ritmo) {
+  return function recomendar(equipe, golpesAtivos, medicao) {
     const nivel = numero(texto(document, "#trainer-level-small").match(/^Lv\. ([\d.]+)$/)?.[1]);
     const niveisEquipe = equipe?.membros.map(membro => numero(membro.nivel.match(/^Lv\. ([\d.]+)$/)?.[1]));
     const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
@@ -167,31 +225,38 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       campo("hunt-estimativa-xp").textContent = "Aguardando níveis";
       campo("hunt-estimativa-drops").textContent = "Aguardando níveis";
       campo("hunt-estimativa-status").textContent = "Aguardando o nível do treinador e dos Pokémon ativos.";
+      campo("hunt-golpes-equipe").textContent = "";
+      campo("hunt-comparacao").textContent = "";
       return;
     }
 
-    const chave = JSON.stringify([nivel, niveisEquipe, vip]);
+    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, vip, golpesAtivos]);
     if (consulta?.chave === chave && Date.now() < consulta.expira) {
-      consulta.ritmo = ritmo;
-      if (consulta.resultado) apresentar(consulta.resultado, ritmo);
+      consulta.medicao = medicao;
+      if (consulta.resultado) apresentar(consulta.resultado, medicao);
       return;
     }
-    const atual = { chave, ritmo, expira: Date.now() + TTL };
+    const atual = { chave, medicao, expira: Date.now() + TTL };
     consulta = atual;
     campo("hunt-estimativa-xp").textContent = "Consultando...";
     campo("hunt-estimativa-drops").textContent = "Consultando...";
     campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
-    void classificar(nivel, niveisEquipe, vip).then(resultado => {
+    campo("hunt-golpes-equipe").textContent = "";
+    campo("hunt-comparacao").textContent = "Consultando as fichas de combate...";
+    void classificar(nivel, niveisEquipe, vip, equipe.membros, golpesAtivos).then(resultado => {
       if (consulta !== atual) return;
       atual.resultado = resultado;
-      if (resultado.falhas || !resultado.xp) atual.expira = Date.now() + 60_000;
-      apresentar(resultado, atual.ritmo);
+      if (resultado.falhas || resultado.dados.some(hunt => !hunt.combate || !Number.isFinite(hunt.xp))) {
+        atual.expira = Date.now() + 60_000;
+      }
+      apresentar(resultado, atual.medicao);
     }).catch(() => {
       if (consulta !== atual) return;
       atual.expira = Date.now() + 60_000;
       campo("hunt-estimativa-xp").textContent = "Estimativa indisponível";
       campo("hunt-estimativa-drops").textContent = "Estimativa indisponível";
       campo("hunt-estimativa-status").textContent = "Não foi possível ler o catálogo. A análise tentará novamente.";
+      campo("hunt-comparacao").textContent = "";
     });
   };
 }
@@ -315,11 +380,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     });
   }
 
-  async function medir(atual, cacada, popup) {
+  async function medir(atual, cacada, popup, perfil) {
     const totais = lerTotais(popup);
     if (!totais) return "Aguardando os totais do Registro da Caçada.";
     const amostra = { ...totais, segundos: cacada.segundos, abates: cacada.abates };
-    if (!atual.base || totais.xp < atual.base.xp || totais.drops < atual.base.drops) {
+    const mudouGolpes = perfil && atual.perfil && perfil !== atual.perfil;
+    if (perfil) atual.perfil = perfil;
+    if (mudouGolpes || !atual.base || totais.xp < atual.base.xp || totais.drops < atual.base.drops) {
       atual.base = amostra;
       return "Medição iniciada para esta equipe.";
     }
@@ -334,6 +401,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
       xp: atual.base.segundos === 0 ? numero(texto(document, "#xp-per-hour")) : porHora("xp"),
       drops: porHora("drops"),
       abatesHora: porHora("abates"),
+      perfil,
       segundos,
       data: Date.now(),
     };
@@ -344,14 +412,14 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     return `Medição atualizada · ${Math.floor(segundos / 60)} min com esta equipe.`;
   }
 
-  function apresentar(equipe, cacada) {
+  function apresentar(equipe, cacada, golpesAtivos, perfil) {
     const historico = equipe ? lerHistorico(equipe.chave) : [];
     const melhor = campo => historico.reduce((primeiro, item) =>
       !primeiro || item[campo] > primeiro[campo] ? item : primeiro, null);
     const xp = melhor("xp");
     const drops = melhor("drops");
-    const ritmo = cacada && historico.find(item => item.hunt === cacada.hunt)?.abatesHora;
-    recomendar(equipe, ritmo);
+    const referencia = cacada && perfil && historico.find(item => item.hunt === cacada.hunt && item.perfil === perfil);
+    recomendar(equipe, golpesAtivos, referencia);
     const xpOficial = numero(texto(document, "#xp-per-hour"));
     mostrar("hunt-equipe", equipe?.membros.map(membro => [membro.nome, membro.nivel].filter(Boolean).join(" ")).join(" · ")
       || "Aguardando a equipe ativa.");
@@ -370,7 +438,9 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
     const cacada = lerCacada();
     acompanhar(equipe, cacada);
     if (!visivel()) return;
-    apresentar(equipe, cacada);
+    const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
+    const perfil = golpesAtivos.length && golpesAtivos.every(Boolean) ? JSON.stringify(golpesAtivos) : null;
+    apresentar(equipe, cacada, golpesAtivos, perfil);
     const atual = sessao;
     if (!atual) return mostrar("hunt-medicao", "Aguardando uma caçada com a equipe ativa.");
     mostrar("hunt-medicao", atual.mensagem || "Aguardando a primeira leitura desta equipe.");
@@ -382,11 +452,11 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar }) {
       return mostrar("hunt-medicao", "Aguardando uma medição completa no Registro da Caçada.");
     }
     atual.proximaLeitura = Date.now() + INTERVALO_LEITURA;
-    try { atual.mensagem = await medir(atual, cacada, popup); }
+    try { atual.mensagem = await medir(atual, cacada, popup, perfil); }
     catch { atual.mensagem = "Não foi possível salvar a medição desta caçada."; }
     if (sessao === atual && visivel()) {
       mostrar("hunt-medicao", atual.mensagem);
-      apresentar(equipe, cacada);
+      apresentar(equipe, cacada, golpesAtivos, perfil);
     }
   }
 

@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.15**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.16**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -77,7 +77,11 @@ A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do 
 
 Abra **Análise de hunts** para ver estimativas antes de testar uma hunt. A extensão verifica o nível do treinador, os níveis da equipe e o VIP, então compara até 12 hunts regulares próximas do nível da equipe, limitado pelo nível do treinador.
 
-Para XP, a análise pondera a XP base de referência de cada espécie pela sua participação nos encontros e aplica os multiplicadores da hunt. Para drops, usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. Quando existe uma medição da hunt atual, a extensão também projeta os valores por hora usando o ritmo de abates medido com a mesma formação. Esse ritmo pode mudar entre hunts. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
+Para XP, a análise pondera a XP base de referência de cada espécie pela sua participação nos encontros e aplica os multiplicadores da hunt. Para drops, usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
+
+Em **Comparar hunts e golpes**, a extensão lista os golpes equipados na barra de habilidades e estima até quatro golpes dos selvagens pelo nível típico da faixa de encontro. A comparação usa tipos, STAB, fraquezas, resistências, imunidades, poder, precisão e recarga. O modelo combina o tempo estimado para abater cada espécie com o risco do dano recebido e pondera pela frequência dos encontros. Usa atributos de referência e golpes de poder fixo. Críticos, efeitos, dano variável, área, genes e bônus individuais podem mudar o resultado no jogo. [Guia de combate](https://multipoke.io/pokepedia/guias/combate)
+
+A classificação combina recompensa por abate e ritmo estimado. Quando existe uma medição da hunt atual com os mesmos golpes equipados e ela está entre as candidatas analisadas, a extensão calibra os ganhos por hora a partir dos abates observados. Sem essa referência, mostra o ritmo relativo entre as hunts. Se os dados de combate estiverem indisponíveis, usa a recompensa por abate.
 
 Deixe a aba da análise aberta durante a caçada para obter uma medição real. A extensão lê o Registro da Caçada do jogo e registra a hunt depois de pelo menos **5 minutos** com a mesma equipe e um abate. Se você já estava na caçada ao começar a medir, ou se trocar a equipe, a extensão começa a contagem a partir da nova leitura.
 
@@ -152,6 +156,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.16 | Análise de hunts com tipos, golpes ativos da equipe e repertório estimado dos selvagens. |
 | 1.5.15 | Um clique no ícone da barra do Chrome alterna a visibilidade do painel Auto Loja. |
 | 1.5.14 | Menu no ícone da extensão para mostrar ou ocultar o painel Auto Loja. |
 | 1.5.13 | Estimativas de XP e drops por abate, com seleção de hunts pelo nível do treinador e da equipe. |
