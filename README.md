@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.18**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.19**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -81,15 +81,15 @@ Para XP, a análise pondera a XP base de referência de cada espécie pela sua p
 
 Em **Comparar hunts e golpes**, cada hunt tem um resumo do ritmo para a equipe atual, dos destaques de XP e drops e de limitações de combate relevantes. O modelo usa os golpes equipados e estima até quatro golpes dos selvagens pelo nível típico da faixa de encontro. Compara tipos, STAB, fraquezas, resistências, imunidades, poder, precisão e recarga. Usa atributos de referência e golpes de poder fixo. Críticos, efeitos, dano variável, área, genes e bônus individuais podem mudar o resultado no jogo. [Guia de combate](https://multipoke.io/pokepedia/guias/combate)
 
-A classificação combina recompensa por abate e ritmo estimado. Quando existe uma medição da hunt atual com os mesmos golpes equipados e ela está entre as candidatas analisadas, a extensão calibra os ganhos por hora a partir dos abates observados. Sem essa referência, mostra o ritmo relativo entre as hunts. Se os dados de combate estiverem indisponíveis, usa a recompensa por abate.
+A classificação combina recompensa por abate e ritmo estimado. Quando há medições recentes da hunt atual com o mesmo time, níveis, golpes e bônus detectados, a extensão calibra os ganhos por hora pelos abates observados. Sem essa referência, mostra o ritmo relativo entre as hunts. Se os dados de combate estiverem indisponíveis, usa a recompensa por abate.
 
-Deixe a aba da análise aberta durante a caçada para obter uma medição real. A extensão lê o Registro da Caçada do jogo e registra a hunt depois de pelo menos **5 minutos** com a mesma equipe e um abate. Se você já estava na caçada ao começar a medir, ou se trocar a equipe, a extensão começa a contagem a partir da nova leitura.
+Deixe a análise aberta ou a troca automática ativa durante a caçada para obter medições reais. A extensão lê o Registro da Caçada em janelas independentes de pelo menos **5 minutos**, com a mesma configuração e pelo menos um abate. Drops/h considera o valor dos itens no registro, sem somar moedas ou capturas e sem descontar consumíveis.
 
-Para comparar, visite outras hunts com a mesma formação e deixe a análise registrar cada uma. O painel mostra a melhor hunt medida para **XP/h** e a melhor para **drops/h**, além do histórico local por treinador e formação. Drops/h considera o valor dos itens no registro, sem somar moedas ou capturas e sem descontar consumíveis. As taxas refletem as condições de cada medição, incluindo o nível da equipe, os bônus e o ritmo de abates.
+O IndexedDB da extensão mantém as **10 janelas mais recentes** e os recordes de XP/h e drops/h por hunt e configuração. As medições antigas do jogo são migradas para o histórico como referência. Em **Histórico da mesma equipe**, use **Exportar backup** e **Importar backup** para guardar ou mesclar as medições em um arquivo JSON. O catálogo também fica salvo no banco para reaproveitar as fichas entre abas e recarregamentos.
 
 ## Troca de hunt
 
-Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. A comparação usa o rendimento estimado por tempo de combate para o time e os golpes atuais. Drops considera o valor de itens comuns vendidos ao NPC.
+Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. Quando as duas hunts comparadas têm medições para a configuração atual, divide o ganho total das janelas recentes pelo tempo observado. Para pares sem medições comparáveis, usa o rendimento estimado. A estimativa de drops considera o valor de itens comuns vendidos ao NPC.
 
 A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro minuto da caçada, exige que a aba do jogo esteja em foco e respeita um intervalo de **5 minutos** entre tentativas de entrada. Pode continuar com o painel recolhido. A ativação dura até pausar, trocar de treinador ou recarregar a aba.
 
@@ -151,6 +151,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.19 | Catálogo e histórico no IndexedDB, backup em JSON e troca de hunt com medições comparáveis. |
 | 1.5.18 | Aba para trocar de hunt automaticamente com prioridade de XP ou drops. |
 | 1.5.17 | Resumo curto por hunt com o ritmo e os destaques para a equipe atual. |
 | `CWS_PUBLISHER_ID` | ID do editor exibido no Painel do desenvolvedor |

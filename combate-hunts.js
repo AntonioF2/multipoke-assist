@@ -87,7 +87,7 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
   }
 
   function carregarEspecie(id) {
-    return comCache(especies, id, async () => {
+    return comCache(especies, id, () => cacheDadosHunts(`especie/${id}`, async () => {
       const ficha = await pagina(`/pokepedia/pokemon/${id}`);
       const nome = texto(ficha, "h1");
       const tipos = [...ficha.querySelectorAll(".entry-meta .type-badge[data-type]")].map(no => no.dataset.type);
@@ -106,21 +106,22 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
         throw new Error("Repertório de golpes indisponível.");
       }
       return { tipos, base, golpes };
-    });
+    }));
   }
 
   async function carregarGolpeExtra(golpe) {
-    indiceGolpes ??= pagina("/pokepedia/golpes").then(paginaGolpes => new Map(
-      [...paginaGolpes.querySelectorAll("a.entry-main[href^='/pokepedia/golpes/']")].map(link => [
+    indiceGolpes ??= cacheDadosHunts("indice-golpes", async () => {
+      const paginaGolpes = await pagina("/pokepedia/golpes");
+      return [...paginaGolpes.querySelectorAll("a.entry-main[href^='/pokepedia/golpes/']")].map(link => [
         nomeCombateHunts(texto(link, "h2")), link.getAttribute("href"),
-      ]),
-    )).catch(() => { indiceGolpes = undefined; return null; });
+      ]);
+    }, linhas => linhas.length > 0).then(linhas => new Map(linhas)).catch(() => { indiceGolpes = undefined; return null; });
     const url = (await indiceGolpes)?.get(nomeCombateHunts(golpe.nome));
     if (!/^\/pokepedia\/golpes\/[\w-]+$/.test(url)) return null;
-    const opcoes = await comCache(golpesExtras, url, async () => {
+    const opcoes = await comCache(golpesExtras, url, () => cacheDadosHunts(`golpe/${url.split("/").at(-1)}`, async () => {
       const ficha = await pagina(url);
       return [...ficha.querySelectorAll("tbody tr")].map(linha => lerGolpe(linha, golpe.nome));
-    });
+    }, linhas => linhas.length > 0));
     return opcoes?.find(opcao => opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria &&
       opcao.poder === numero(golpe.poder.match(/^Poder ([\d.]+)$/)?.[1])) ??
       opcoes?.find(opcao => opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria);
@@ -136,11 +137,12 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
 
   async function carregarEquipe(membros, niveis, golpesAtivos) {
     if (golpesAtivos.some(golpes => !golpes)) return null;
-    indice ??= pagina("/pokepedia/pokemon").then(paginaEspecies => new Map(
-      [...paginaEspecies.querySelectorAll("article[data-filter-name][data-filter-number]")].map(no => [
+    indice ??= cacheDadosHunts("indice-especies", async () => {
+      const paginaEspecies = await pagina("/pokepedia/pokemon");
+      return [...paginaEspecies.querySelectorAll("article[data-filter-name][data-filter-number]")].map(no => [
         nomeCombateHunts(no.dataset.filterName), no.dataset.filterNumber,
-      ]),
-    )).catch(() => { indice = undefined; return null; });
+      ]);
+    }, linhas => linhas.length > 0).then(linhas => new Map(linhas)).catch(() => { indice = undefined; return null; });
     const nomes = await indice;
     if (!nomes) return null;
     const equipe = await Promise.all(membros.map(async (membro, i) => {

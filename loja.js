@@ -240,8 +240,12 @@
         <details class="regras">
           <summary>Histórico da mesma equipe</summary>
           <p id="hunt-historico"></p>
+          <button id="hunt-exportar" type="button">Exportar backup</button>
+          <button id="hunt-importar" type="button">Importar backup</button>
+          <input id="hunt-arquivo" type="file" accept=".json,application/json" hidden>
+          <p id="hunt-backup-status" role="status"></p>
         </details>
-        <p><small>Deixe a análise aberta durante a caçada. A comparação usa medições de pelo menos 5 minutos. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
+        <p><small>As medições usam janelas de pelo menos 5 minutos com a análise aberta ou a troca automática ativa. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
         <p>Troque de hunt quando outra área disponível render mais para a equipe atual.</p>

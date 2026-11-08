@@ -1,5 +1,5 @@
 function pontuacaoCombateHunt(hunt, metrica) {
-  return Number.isFinite(hunt?.combate?.custo) ? hunt[metrica] / hunt.combate.custo : NaN;
+  return Number.isFinite(hunt?.combate?.custo) && Number.isFinite(hunt[metrica]) ? hunt[metrica] / hunt.combate.custo : NaN;
 }
 
 function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
@@ -57,7 +57,8 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       const dados = linha.split(",");
       if (/^\d+$/.test(dados[id]) && /^[1-9]\d*$/.test(dados[base])) xp.set(dados[id], Number(dados[base]));
     }
-    return xp;
+    if (!xp.size) throw new Error("Referência de XP vazia.");
+    return [...xp];
   }
 
   function carregarCatalogo() {
@@ -65,9 +66,12 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       const atual = { expira: Date.now() + TTL };
       fichas.clear();
       combate.limparCache();
-      atual.promessa = Promise.all([lerIndice(), lerXpBase().catch(() => null)]).then(([hunts, xp]) => {
+      atual.promessa = Promise.all([
+        cacheDadosHunts("indice", lerIndice),
+        cacheDadosHunts("xp", lerXpBase).catch(() => null),
+      ]).then(([hunts, xp]) => {
         if (!xp) atual.expira = Date.now() + 60_000;
-        return { hunts, xp };
+        return { hunts, xp: xp && new Map(xp) };
       }).catch(erro => {
         atual.expira = Date.now() + 60_000;
         throw erro;
@@ -105,7 +109,10 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
 
   function fichaComCache(hunt) {
     if (!fichas.has(hunt.url)) {
-      const promessa = lerFicha(hunt).catch(() => {
+      const promessa = cacheDadosHunts(`hunt/${hunt.slug}`, () => lerFicha(hunt), ficha =>
+        Number.isSafeInteger(ficha.nivelMinimo) && Number.isFinite(ficha.drops) && ficha.fatorXp > 0 &&
+        ficha.encontros.length && ficha.encontros.every(encontro => encontro.id && encontro.peso > 0 && encontro.minimo > 0),
+      ).then(ficha => ({ ...ficha, ...hunt })).catch(() => {
         if (fichas.get(hunt.url) === promessa) fichas.delete(hunt.url);
         return null;
       });
@@ -171,7 +178,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     const { dados, elegiveis, falhas } = resultado;
     const comparadas = dados.filter(hunt => hunt.combate);
     const comCombate = comparadas.length > 0;
-    const referencia = comparadas.find(hunt => nomeCombateHunts(hunt.nome) === nomeCombateHunts(medicao?.hunt ?? ""));
+    const referencia = comparadas.find(hunt => hunt.slug === medicao?.area);
     const fatorHora = Number.isFinite(referencia?.combate.custo) && medicao.abatesHora > 0
       ? referencia.combate.custo * medicao.abatesHora : NaN;
     const candidatas = comCombate ? comparadas : dados;
@@ -266,10 +273,10 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
 function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts }) {
   const MINIMO_SEGUNDOS = 300;
   const INTERVALO_LEITURA = 15_000;
-  const PREFIXO = "multipoke.auto-loja.hunts.";
-  const historicoTemporario = new Map();
   const recomendar = criarRecomendadorHunts(campo, { texto, numero, formatar });
   let sessao;
+  let consultaHistorico;
+  const historico = criarAcessoHistoricoHunts(campo, () => { consultaHistorico = undefined; });
 
   const visivel = () => campo("painel").open && !campo("aba-hunts").hidden;
   const mostrar = (id, valor) => {
@@ -289,7 +296,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
       };
     });
     if (!nome || !membros.length || membros.some(membro => !membro.id || !membro.nome)) return;
-    const chave = PREFIXO + JSON.stringify([nome, membros.map(({ id, nome }) => [id, nome])]);
+    const chave = JSON.stringify([nome, membros.map(({ id, nome }) => [id, nome])]);
     return { chave, membros };
   }
 
@@ -313,12 +320,12 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
       sessao = undefined;
       return;
     }
-    if (sessao?.chave !== equipe.chave || sessao.hunt !== cacada.hunt ||
+    if (sessao?.chave !== equipe.chave || sessao.hunt !== cacada.hunt || sessao.slug !== cacada.slug ||
         cacada.segundos < sessao.segundos || cacada.abates < sessao.abates) {
       sessao = {
         chave: equipe.chave,
         hunt: cacada.hunt,
-        base: cacada.segundos <= 15 && cacada.abates === 0 ? { segundos: 0, xp: 0, drops: 0, abates: 0 } : null,
+        slug: cacada.slug,
         proximaLeitura: 0,
         mensagem: "",
       };
@@ -358,70 +365,69 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     if (Number.isSafeInteger(xp) && Number.isSafeInteger(drops)) return { xp, drops };
   }
 
-  function lerHistorico(chave) {
-    if (historicoTemporario.has(chave)) return historicoTemporario.get(chave);
-    try {
-      const salvas = JSON.parse(localStorage.getItem(chave));
-      if (Array.isArray(salvas)) {
-        return salvas.filter(item => typeof item?.hunt === "string" &&
-          [item.xp, item.drops, item.segundos, item.data].every(Number.isSafeInteger));
-      }
-    } catch { /* O histórico também pode ser mantido nesta aba. */ }
-    return [];
+  function contextoMedicao(equipe, golpesAtivos) {
+    if (!equipe || !golpesAtivos.every(Boolean)) return "";
+    const bonus = [...document.querySelectorAll("#active-boosts:not([hidden]) button")]
+      .map(botao => botao.hasAttribute("data-live-xp-badge") ? "live" : botao.title.split(" · ")[0]).sort();
+    const eventos = [...document.querySelectorAll("#global-boost-events:not([hidden]) button[data-global-boost-event]:not([hidden])")]
+      .map(botao => [botao.dataset.globalBoostEvent, [...botao.querySelectorAll("[data-global-boost-kind]")].map(no => no.textContent.trim())]);
+    const tipoDia = document.querySelector("#global-boost-events button[data-daily-type]:not([hidden])")?.dataset.dailyType;
+    const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
+    return JSON.stringify([equipe.membros.map(membro => membro.nivel), golpesAtivos, vip, bonus, eventos, tipoDia ?? ""]);
   }
 
-  function salvar(chave, medicao) {
-    return navigator.locks.request(chave, () => {
-      const historico = lerHistorico(chave);
-      const anterior = historico.find(item => item.hunt === medicao.hunt);
-      if (anterior?.data > medicao.data) return;
-      const dados = [medicao, ...historico.filter(item => item.hunt !== medicao.hunt)].slice(0, 100);
-      try {
-        localStorage.setItem(chave, JSON.stringify(dados));
-        historicoTemporario.delete(chave);
-      } catch { historicoTemporario.set(chave, dados); }
-    });
-  }
-
-  async function medir(atual, cacada, popup, perfil) {
-    const totais = lerTotais(popup);
-    if (!totais) return "Aguardando os totais do Registro da Caçada.";
-    const amostra = { ...totais, segundos: cacada.segundos, abates: cacada.abates };
-    const mudouGolpes = perfil && atual.perfil && perfil !== atual.perfil;
-    if (perfil) atual.perfil = perfil;
-    if (mudouGolpes || !atual.base || totais.xp < atual.base.xp || totais.drops < atual.base.drops) {
-      atual.base = amostra;
-      return "Medição iniciada para esta equipe.";
-    }
-
-    const segundos = amostra.segundos - atual.base.segundos;
-    if (segundos < MINIMO_SEGUNDOS || amostra.abates <= atual.base.abates) {
-      return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min e pelo menos um abate.`;
-    }
-    const porHora = campo => Math.round((amostra[campo] - atual.base[campo]) * 3600 / segundos);
-    const medicao = {
-      hunt: cacada.hunt,
-      xp: atual.base.segundos === 0 ? numero(texto(document, "#xp-per-hour")) : porHora("xp"),
-      drops: porHora("drops"),
-      abatesHora: porHora("abates"),
-      perfil,
-      segundos,
-      data: Date.now(),
+  function consultarHistorico(equipe, contexto) {
+    const chave = JSON.stringify([equipe, contexto]);
+    if (consultaHistorico?.chave === chave && Date.now() < consultaHistorico.expira) return consultaHistorico.dados;
+    const atual = {
+      chave, expira: Date.now() + 30_000,
+      dados: consultaHistorico?.chave === chave ? consultaHistorico.dados : undefined,
     };
-    if (![medicao.xp, medicao.drops, medicao.abatesHora].every(Number.isSafeInteger)) {
-      return "Ganhos fora da faixa de leitura.";
+    consultaHistorico = atual;
+    void historico.ler(equipe, contexto).then(dados => { atual.dados = dados; }).catch(() => {
+      atual.dados = { recordes: [], rendimentos: [], indisponivel: true };
+    });
+    return atual.dados;
+  }
+
+  async function medir(atual, cacada, popup, contexto) {
+    if (!atual.pendente) {
+      const totais = lerTotais(popup);
+      if (!totais) return "Aguardando os totais do Registro da Caçada.";
+      const amostra = { ...totais, segundos: cacada.segundos, abates: cacada.abates };
+      const base = atual.base;
+      const intervalo = cacada.segundos - (atual.ultimaLeitura ?? -Infinity);
+      atual.ultimaLeitura = cacada.segundos;
+      if (!base || intervalo > 45 || totais.xp < base.xp || totais.drops < base.drops) {
+        atual.base = amostra;
+        return "Medição iniciada para esta equipe.";
+      }
+
+      const segundos = amostra.segundos - base.segundos;
+      const abates = amostra.abates - base.abates;
+      if (segundos < MINIMO_SEGUNDOS || abates <= 0) {
+        return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min e pelo menos um abate.`;
+      }
+      atual.pendente = { amostra, medicao: {
+        equipe: atual.chave, contexto, area: cacada.slug, hunt: cacada.hunt,
+        id: crypto.randomUUID(), data: Date.now(), legado: false, segundos, abates,
+        xp: amostra.xp - base.xp, drops: amostra.drops - base.drops,
+      } };
     }
-    await salvar(atual.chave, medicao);
+    const { medicao, amostra } = atual.pendente;
+    await historico.salvar(medicao);
+    atual.pendente = null;
+    if (atual.contexto === medicao.contexto && atual.base) atual.base = amostra;
+    const { segundos } = medicao;
     return `Medição atualizada · ${Math.floor(segundos / 60)} min com esta equipe.`;
   }
 
-  function apresentar(equipe, cacada, perfil) {
-    const historico = equipe ? lerHistorico(equipe.chave) : [];
-    const melhor = campo => historico.reduce((primeiro, item) =>
-      !primeiro || item[campo] > primeiro[campo] ? item : primeiro, null);
+  function apresentar(equipe, cacada, dados) {
+    const recordes = dados?.recordes ?? [];
+    const melhor = campo => recordes.reduce((primeiro, item) =>
+      !primeiro || item[campo][campo] > primeiro[campo] ? item[campo] : primeiro, null);
     const xp = melhor("xp");
     const drops = melhor("drops");
-    const referencia = cacada && perfil && historico.find(item => item.hunt === cacada.hunt && item.perfil === perfil);
     const xpOficial = numero(texto(document, "#xp-per-hour"));
     mostrar("hunt-equipe", equipe?.membros.map(membro => [membro.nome, membro.nivel].filter(Boolean).join(" ")).join(" · ")
       || "Aguardando a equipe ativa.");
@@ -430,11 +436,16 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
       : "Entre em uma hunt para iniciar a medição.");
     mostrar("hunt-melhor-xp", xp ? `${xp.hunt} · ${formatar(xp.xp)} XP/h` : "Aguardando medição");
     mostrar("hunt-melhor-drops", drops ? `${drops.hunt} · ${formatar(drops.drops)} Pokédollars/h` : "Aguardando medição");
-    mostrar("hunt-historico", historico.length
-      ? historico.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min`).join("\n")
-      : "Ainda sem hunts medidas com esta formação.");
-    return referencia;
+    const recentes = recordes.map(item => item.ultima).sort((a, b) => b.data - a.data).slice(0, 100);
+    mostrar("hunt-historico", recentes.length
+      ? recentes.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min${item.legado ? " · histórico anterior" : ""}`).join("\n")
+      : dados?.indisponivel ? "Histórico indisponível. Tentando reconectar ao banco local."
+        : equipe && !dados ? "Carregando histórico..." : "Ainda sem hunts medidas com esta formação.");
   }
+
+  const reiniciarJanela = () => { if (sessao) sessao.base = null; };
+  window.addEventListener("blur", reiniciarJanela);
+  document.addEventListener("visibilitychange", reiniciarJanela);
 
   async function atualizar() {
     const equipe = equipeAtual();
@@ -442,39 +453,45 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     acompanhar(equipe, cacada);
     const mostraAnalise = visivel();
     const trocaAtiva = trocaHunts.ativa();
-    if (!mostraAnalise && !trocaAtiva) return;
+    if (!mostraAnalise && !trocaAtiva) return reiniciarJanela();
     const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
-    const perfil = golpesAtivos.length && golpesAtivos.every(Boolean) ? JSON.stringify(golpesAtivos) : null;
-    const referencia = mostraAnalise && apresentar(equipe, cacada, perfil);
+    const contextoAtual = contextoMedicao(equipe, golpesAtivos);
+    const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
+    const rendimentos = historicoAtual?.rendimentos;
+    const referencia = rendimentos?.find(item => item.area === cacada?.slug);
+    if (mostraAnalise) apresentar(equipe, cacada, historicoAtual);
     const slugAtual = trocaAtiva ? cacada?.slug : undefined;
     const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual) : undefined;
     if (trocaAtiva) {
       const contexto = (time, golpes) => JSON.stringify([time, golpes, texto(document, "#trainer-level-small"),
-        document.getElementById("trainer-vip-status")?.dataset.active]);
+        contextoMedicao(time, golpes)]);
       const inicial = contexto(equipe, golpesAtivos);
-      void trocaHunts.atualizar(dados, cacada, treinador(), () => {
+      void trocaHunts.atualizar(historicoAtual && dados, cacada, treinador(), () => {
         const time = equipeAtual();
         return lerCacada()?.slug === slugAtual && contexto(time, time ? lerGolpesHunts(time.membros) : []) === inicial;
-      });
+      }, rendimentos);
     }
-    if (!mostraAnalise) return;
     const atual = sessao;
-    if (!atual) return mostrar("hunt-medicao", "Aguardando uma caçada com a equipe ativa.");
+    if (!atual || !cacada.slug || !contextoAtual) return mostrar("hunt-medicao", "Aguardando uma caçada e a leitura dos golpes da equipe.");
+    if (atual.contexto !== contextoAtual) {
+      atual.contexto = contextoAtual;
+      atual.base = null;
+    }
     mostrar("hunt-medicao", atual.mensagem || "Aguardando a primeira leitura desta equipe.");
-    if (Date.now() < atual.proximaLeitura || document.hidden || !document.hasFocus() ||
-        document.querySelector("dialog[open], #drawer.open")) return;
+    if (trocaHunts.emTroca() || document.hidden || !document.hasFocus() ||
+        document.querySelector("dialog[open], #drawer.open, body.pvp-mode")) return reiniciarJanela();
+    if (atual.lendo || Date.now() < atual.proximaLeitura) return;
     const popup = document.getElementById("analyzer-insight");
     if (!popup?.hidden) return mostrar("hunt-medicao", "Aguardando o Registro da Caçada ficar disponível.");
     if (!/^[+-]?\$\s*[\d.]+$/.test(texto(document, "#metric-profit-rate"))) {
       return mostrar("hunt-medicao", "Aguardando uma medição completa no Registro da Caçada.");
     }
     atual.proximaLeitura = Date.now() + INTERVALO_LEITURA;
-    try { atual.mensagem = await medir(atual, cacada, popup, perfil); }
+    atual.lendo = true;
+    try { atual.mensagem = await medir(atual, cacada, popup, contextoAtual); }
     catch { atual.mensagem = "Não foi possível salvar a medição desta caçada."; }
-    if (sessao === atual && visivel()) {
-      mostrar("hunt-medicao", atual.mensagem);
-      recomendar(equipe, golpesAtivos, apresentar(equipe, cacada, perfil), slugAtual);
-    }
+    finally { atual.lendo = false; }
+    if (sessao === atual && visivel()) mostrar("hunt-medicao", atual.mensagem);
   }
 
   setInterval(() => void atualizar(), 5000);

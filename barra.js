@@ -1,3 +1,5 @@
+importScripts("banco-hunts.js");
+
 function alternarPainel() {
   if (location.origin !== "https://multipoke.io" || !/^\/jogar\/?$/.test(location.pathname)) return;
 

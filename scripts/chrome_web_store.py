@@ -15,7 +15,7 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 API = "https://chromewebstore.googleapis.com"
-FILES = ("ativar.html", "ativar.js", "autocaptura.js", "combate-hunts.js", "analise-hunts.js", "troca-hunts.js", "loja.js", "barra.js", "dragonite.png", "icone-128.png")
+FILES = ("ativar.html", "ativar.js", "autocaptura.js", "dados-hunts.js", "combate-hunts.js", "analise-hunts.js", "troca-hunts.js", "loja.js", "barra.js", "banco-hunts.js", "dragonite.png", "icone-128.png")
 UPLOAD_RUNNING = {"IN_PROGRESS", "UPLOAD_IN_PROGRESS"}
 
 

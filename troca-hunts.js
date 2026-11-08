@@ -121,7 +121,7 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
     }
   }
 
-  async function atualizar(dados, cacada, treinador, confirmarContexto) {
+  async function atualizar(dados, cacada, treinador, confirmarContexto, rendimentos = []) {
     if (pendente) {
       if (cacada?.slug === pendente.slug) {
         informar(`Troca confirmada para ${pendente.nome}.${sessao ? " Aguardando o intervalo antes de outra troca." : ""}`);
@@ -149,16 +149,27 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
 
     const metrica = atual.metrica;
     const huntAtual = dados.find(hunt => hunt.slug === cacada.slug);
-    const base = pontuacaoCombateHunt(huntAtual, metrica);
-    if (!Number.isFinite(base)) return informar("Aguardando uma estimativa de combate para a hunt atual.");
+    if (!huntAtual) return informar("Aguardando dados da hunt atual.");
+    const medidos = new Map(rendimentos.map(item => [item.area, item[metrica]]));
+    const baseMedida = medidos.get(huntAtual.slug);
+    const baseEstimada = pontuacaoCombateHunt(huntAtual, metrica);
     const candidatas = dados.filter(hunt => hunt !== huntAtual && !bloqueadas.has(hunt.slug))
-      .map(hunt => ({ hunt, pontos: pontuacaoCombateHunt(hunt, metrica) }))
-      .filter(({ pontos }) => pontos > base && pontos >= base * (1 + atual.minimo / 100))
-      .sort((a, b) => b.pontos - a.pontos);
+      .map(hunt => {
+        const pontosMedidos = medidos.get(hunt.slug);
+        const medida = Number.isFinite(baseMedida) && Number.isFinite(pontosMedidos);
+        const base = medida ? baseMedida : baseEstimada;
+        const pontos = medida ? pontosMedidos : pontuacaoCombateHunt(hunt, metrica);
+        return { hunt, pontos, medida, ganho: pontos > base ? (base === 0 ? Infinity : pontos / base - 1) : 0 };
+      })
+      .filter(({ ganho }) => ganho >= atual.minimo / 100 - Number.EPSILON)
+      .sort((a, b) => b.ganho - a.ganho || Number(b.medida) - Number(a.medida) || b.pontos - a.pontos);
     const alvo = candidatas[0];
     if (!alvo) return informar(`Nenhuma hunt disponível entre as comparadas alcançou a melhoria mínima de ${formatar(atual.minimo)}%.`);
-    const { hunt, pontos } = alvo;
-    const ganho = base > 0 ? ` (+${formatar(Math.round((pontos / base - 1) * 100))}% estimados)` : " (ganho estimado acima de zero)";
+    const { hunt, medida } = alvo;
+    const origem = medida ? "medição recente" : "estimativa";
+    const ganho = Number.isFinite(alvo.ganho)
+      ? ` (+${formatar(Math.round(alvo.ganho * 100))}% por ${origem})`
+      : ` (ganho acima de zero por ${origem})`;
     if (!livre()) return informar(`${hunt.nome}${ganho}. Aguardando o jogo livre e em foco.`);
 
     ocupada = true;

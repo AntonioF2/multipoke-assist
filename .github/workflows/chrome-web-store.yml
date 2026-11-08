@@ -31,6 +31,8 @@ jobs:
         run: |
           node --check autocaptura.js
           node --check combate-hunts.js
+          node --check dados-hunts.js
+          node --check banco-hunts.js
           node --check analise-hunts.js
           node --check troca-hunts.js
           node --check loja.js
