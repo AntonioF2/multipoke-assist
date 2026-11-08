@@ -119,6 +119,15 @@
         background: #5f0715; border: 1px solid #ffb4bf; }
       #estado[data-ativa]::before { background: #54ff72; border-color: #ceffd5;
         box-shadow: 0 0 7px #54ff72; }
+      #abas { display: flex; gap: 6px; margin: 9px 12px 6px; }
+      #abas button { flex: 1; border: 1px solid #a6b7d0; border-radius: 6px; padding: 5px 6px;
+        background: #edf3ff; color: var(--azul); font-weight: 700; }
+      #abas button[aria-pressed="true"] { background: var(--azul); color: #fff; }
+      #aba-hunts { padding: 0 12px 12px; }
+      .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
+      .hunt-resumo strong, .hunt-resumo span { display: block; }
+      #hunt-historico { white-space: pre-line; }
+      #hunt-medicao, #aba-hunts small { color: #445b7d; }
       .regras { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
       .regras > summary { font-weight: 700; }
       #regras-pokemon label { margin: 3px 0; }
@@ -162,6 +171,11 @@
           <span><span class="titulo">Auto Loja</span><span id="estado" role="status">Offline</span></span>
         </span>
       </summary>
+      <div id="abas" role="group" aria-label="Seções da Auto Loja">
+        <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
+        <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false">Análise de hunts</button>
+      </div>
+      <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
         <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
         <div><label>Poké Bola <select id="bola"><option value="">Sem reposição</option></select></label>
@@ -197,10 +211,35 @@
       <button id="alternar" type="button">Iniciar Auto Loja</button>
       <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
       <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
+      </section>
+      <section id="aba-hunts" aria-labelledby="abrir-hunts" hidden>
+        <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
+        <p id="hunt-atual"></p>
+        <div class="hunt-resumo"><strong>Melhor para XP</strong><span id="hunt-melhor-xp"></span></div>
+        <div class="hunt-resumo"><strong>Melhor para drops</strong><span id="hunt-melhor-drops"></span></div>
+        <p id="hunt-medicao" role="status"></p>
+        <details class="regras">
+          <summary>Histórico da mesma equipe</summary>
+          <p id="hunt-historico"></p>
+        </details>
+        <p><small>Deixe a análise aberta durante a caçada. A comparação usa medições de pelo menos 5 minutos. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
+      </section>
     </details>`;
   document.body.append(painel);
 
   const campo = id => interfaceLoja.getElementById(id);
+  const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar });
+  for (const aba of ["loja", "hunts"]) {
+    campo(`abrir-${aba}`).addEventListener("click", () => {
+      const hunts = aba === "hunts";
+      campo("abrir-loja").setAttribute("aria-pressed", String(!hunts));
+      campo("abrir-hunts").setAttribute("aria-pressed", String(hunts));
+      campo("aba-loja").hidden = hunts;
+      campo("aba-hunts").hidden = !hunts;
+      if (hunts) void atualizarAnalise();
+      else void atualizarEstoque();
+    });
+  }
   configurarArraste(painel, campo("cabecalho"), campo("arrastar"));
   const botaoCaptura = campo("alternar-captura");
   const raiz = document.documentElement;
@@ -788,7 +827,7 @@
   }
 
   async function atualizarEstoque() {
-    if (!campo("painel").open || ocupada || document.hidden || !document.hasFocus() ||
+    if (!campo("painel").open || campo("aba-loja").hidden || ocupada || document.hidden || !document.hasFocus() ||
         !jogo("#game-shell:not([inert])")) return;
     const nome = treinador();
     if (!nome) return;
@@ -831,7 +870,10 @@
 
   campo("buscar-loot").addEventListener("input", mostrarCatalogo);
   campo("modo-venda").addEventListener("change", mostrarCatalogo);
-  campo("painel").addEventListener("toggle", atualizarEstoque);
+  campo("painel").addEventListener("toggle", () => {
+    if (campo("aba-hunts").hidden) void atualizarEstoque();
+    else void atualizarAnalise();
+  });
   for (const id of camposCompra) {
     const controle = campo(id);
     const seletor = controle.matches("select");

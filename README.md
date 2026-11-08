@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.11**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.12**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -70,6 +70,12 @@ Antes de uma venda automática, a Auto Loja limpa as marcações existentes na l
 Com qualidade abaixo de **1,30** e IV total abaixo de **80**, o modo **E** exige os dois limites e o modo **OU** exige pelo menos um. Um Pokémon com qualidade exatamente **1,30** só pode passar pelo critério de IV. O mesmo vale para IV exatamente **80** em relação ao critério de qualidade.
 
 A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do treinador em qualquer hunt ativa, priorizando as capturas mais antigas. Durante a venda automática, aplica os critérios do Auto Loja e restaura os filtros manuais da loja ao terminar. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny e Holo ficam protegidos, assim como os de qualidade **Lendária ou superior** (a partir de **1,70**). Se houver Pokémon selecionados manualmente na loja, o Auto Loja pausa antes de vender.
+
+## Análise de hunts
+
+Abra **Análise de hunts** no painel e deixe a aba da análise aberta durante a caçada. A extensão lê o Registro da Caçada do jogo e registra a hunt depois de pelo menos **5 minutos** com a mesma equipe e um abate. Se você já estava na caçada ao começar a medir, ou se trocar a equipe, a extensão começa a contagem a partir da nova leitura.
+
+Para comparar, visite outras hunts com a mesma formação e deixe a análise registrar cada uma. O painel mostra a melhor hunt medida para **XP/h** e a melhor para **drops/h**, além do histórico local por treinador e formação. Drops/h considera o valor dos itens no registro, sem somar moedas ou capturas e sem descontar consumíveis. As taxas refletem as condições de cada medição, incluindo o nível da equipe, os bônus e o ritmo de abates.
 
 ## Quando o Auto Loja funciona
 
@@ -140,6 +146,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.12 | Aba **Análise de hunts** compara XP e drops por hora medidos para a equipe ativa. |
 | 1.5.11 | Pacote e fluxo de publicação de atualizações na Chrome Web Store. |
 | 1.5.10 | A Auto Loja pede a correção de um IV incompleto antes de iniciar a venda de Pokémon. |
 | 1.5.9 | A Auto Loja limpa a seleção de loot antes de marcar os itens autorizados para a venda. |

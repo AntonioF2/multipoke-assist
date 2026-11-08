@@ -30,6 +30,7 @@ jobs:
       - name: Validar e empacotar
         run: |
           node --check autocaptura.js
+          node --check analise-hunts.js
           node --check loja.js
           node --check ativar.js
           python3 scripts/chrome_web_store.py package multipoke-autocaptura.zip

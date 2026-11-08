@@ -33,7 +33,7 @@ async function ativar() {
     return;
   }
 
-  await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["loja.js"] });
+  await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["analise-hunts.js", "loja.js"] });
   statusAtivacao.textContent = "O painel Auto Loja e o controle da Autocaptura estão na aba do MultiPoke.";
   await chrome.tabs.update(aba.id, { active: true });
   await chrome.windows.update(aba.windowId, { focused: true });
