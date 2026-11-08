@@ -2,17 +2,16 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.10**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.11**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
-## Instalação no Chrome
+## Instalação no Chrome em modo de desenvolvimento
 
-1. Entre no GitHub com uma conta que tenha acesso ao repositório privado.
-2. Abra a [branch principal](https://github.com/AntonioF2/multipoke-autocaptura/tree/main) e clique em **Code → Download ZIP**. Extraia o arquivo para uma pasta de sua escolha.
-3. No mesmo perfil do Chrome que você usa para jogar, abra `chrome://extensions` e ative o **Modo do desenvolvedor**.
-4. Clique em **Carregar sem compactação** e selecione a pasta extraída que contém o arquivo `manifest.json`.
-5. Confira se **MultiPoke Autocaptura** aparece na lista. Se quiser deixar o ícone à mão, abra o menu de extensões do Chrome e fixe a extensão na barra.
+1. Abra a [branch principal](https://github.com/AntonioF2/multipoke-autocaptura/tree/main) e clique em **Code → Download ZIP**. Extraia o arquivo para uma pasta de sua escolha.
+2. No mesmo perfil do Chrome que você usa para jogar, abra `chrome://extensions` e ative o **Modo do desenvolvedor**.
+3. Clique em **Carregar sem compactação** e selecione a pasta extraída que contém o arquivo `manifest.json`.
+4. Confira se **MultiPoke Autocaptura** aparece na lista. Se quiser deixar o ícone à mão, abra o menu de extensões do Chrome e fixe a extensão na barra.
 
-Se preferir clonar o repositório, use o comando abaixo e selecione a pasta clonada no passo 4.
+Se preferir clonar o repositório, use o comando abaixo e selecione a pasta clonada no passo 3.
 
 ```bash
 git clone https://github.com/AntonioF2/multipoke-autocaptura.git
@@ -81,16 +80,67 @@ A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do 
 
 ## Como atualizar
 
+Para receber atualizações automáticas, instale a extensão pela Chrome Web Store quando a listagem estiver disponível. Se você usava a instalação sem compactação, desative essa cópia ao trocar para a versão da loja.
+
+Na instalação em modo de desenvolvimento, siga estes passos.
+
 1. Atualize os arquivos na pasta que o Chrome carrega. Se você clonou o repositório, abra a branch `main` com `git switch main` e execute `git pull --ff-only` dentro da pasta do projeto. Se usou ZIP, baixe e extraia a versão nova na pasta da extensão.
 2. Em `chrome://extensions`, clique em **Recarregar** no cartão **MultiPoke Autocaptura** e confira a versão.
 3. Atualize a aba do jogo para carregar a Autocaptura e o painel automaticamente. Para ativar as compras e vendas, clique em **Iniciar Auto Loja** no painel.
 
 Se o painel não aparecer, confira se você carregou a versão completa, se a aba está em `multipoke.io/jogar` e se a extensão está instalada no mesmo perfil do Chrome.
 
+## Publicação e atualizações na Chrome Web Store
+
+O fluxo [Chrome Web Store](https://github.com/AntonioF2/multipoke-autocaptura/actions/workflows/chrome-web-store.yml) gera `multipoke-autocaptura.zip` a cada push na `main`. Depois de configurado, ele envia à revisão versões do `manifest.json` maiores que as já publicadas ou submetidas. O Chrome distribui a versão depois da aprovação. [API de publicação](https://developer.chrome.com/docs/webstore/using-api)
+
+### Primeira publicação
+
+1. Abra o [Painel do desenvolvedor](https://chrome.google.com/webstore/devconsole/), habilite a verificação em duas etapas e conclua o cadastro se for seu primeiro item.
+2. Baixe `multipoke-autocaptura.zip` em **Artifacts** na execução mais recente do fluxo e envie o arquivo em **Adicionar novo item**. Use o ID que o painel atribuir. O ZIP da loja usa uma identidade própria e o lançador `.bat` se aplica à instalação local.
+3. Preencha a ficha e as declarações de privacidade, anexe os materiais pedidos pelo painel e use a [política de privacidade do projeto](https://github.com/AntonioF2/multipoke-autocaptura/blob/main/PRIVACIDADE.md). Escolha a visibilidade **Pública** e envie a primeira versão para revisão. [Guia da primeira publicação](https://developer.chrome.com/docs/webstore/publish)
+
+### Vincular o GitHub Actions
+
+Em um projeto do Google Cloud, habilite a Chrome Web Store API e configure uma conta de serviço com credenciais temporárias do GitHub. O bloco abaixo pode ser executado no Cloud Shell após substituir `SEU_PROJETO` pelo ID do projeto. A condição vincula a conta a este repositório e ao fluxo da branch `main`. [Federação de identidade no Google Cloud](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)
+
+```bash
+PROJECT_ID="SEU_PROJETO"
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+SERVICE_ACCOUNT="cws-publisher@${PROJECT_ID}.iam.gserviceaccount.com"
+POOL="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/multipoke-cws"
+
+gcloud services enable iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com chromewebstore.googleapis.com \
+  --project="$PROJECT_ID"
+gcloud iam service-accounts create cws-publisher --project="$PROJECT_ID"
+gcloud iam workload-identity-pools create multipoke-cws --location=global --project="$PROJECT_ID"
+gcloud iam workload-identity-pools providers create-oidc github \
+  --location=global --workload-identity-pool=multipoke-cws --project="$PROJECT_ID" \
+  --issuer-uri=https://token.actions.githubusercontent.com \
+  --attribute-mapping='google.subject=assertion.sub,attribute.repository_id=assertion.repository_id' \
+  --attribute-condition="assertion.repository_id=='1449608632' && assertion.ref=='refs/heads/main' && assertion.workflow_ref=='AntonioF2/multipoke-autocaptura/.github/workflows/chrome-web-store.yml@refs/heads/main'"
+gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT" \
+  --project="$PROJECT_ID" --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/${POOL}/attribute.repository_id/1449608632"
+printf 'CWS_SERVICE_ACCOUNT=%s\nCWS_WORKLOAD_IDENTITY_PROVIDER=%s/providers/github\n' "$SERVICE_ACCOUNT" "$POOL"
+```
+
+Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da Chrome Web Store. Depois, no GitHub, em **Settings → Secrets and variables → Actions → Variables**, cadastre estas quatro variáveis. [Vínculo da conta de serviço](https://developer.chrome.com/docs/webstore/service-accounts)
+
+| Variável | Valor |
+| --- | --- |
+| `CWS_PUBLISHER_ID` | ID do editor exibido no Painel do desenvolvedor |
+| `CWS_EXTENSION_ID` | ID do item criado na Chrome Web Store |
+| `CWS_SERVICE_ACCOUNT` | E-mail da conta de serviço mostrado no Cloud Shell |
+| `CWS_WORKLOAD_IDENTITY_PROVIDER` | Identificador do provedor mostrado no Cloud Shell |
+
+Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `manifest.json` quando preparar uma versão para distribuição.
+
 ## Histórico de atualizações
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.11 | Pacote e fluxo de publicação de atualizações na Chrome Web Store. |
 | 1.5.10 | A Auto Loja pede a correção de um IV incompleto antes de iniciar a venda de Pokémon. |
 | 1.5.9 | A Auto Loja limpa a seleção de loot antes de marcar os itens autorizados para a venda. |
 | 1.5.8 | Loot elegível abaixo de 10.000 Pokédollars permitido por padrão e opção **Bloquear venda** por item. |
