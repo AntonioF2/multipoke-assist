@@ -2,6 +2,35 @@ function pontuacaoCombateHunt(hunt, metrica) {
   return Number.isFinite(hunt?.combate?.custo) && Number.isFinite(hunt[metrica]) ? hunt[metrica] / hunt.combate.custo : NaN;
 }
 
+function lerBonusHunts() {
+  const fator = (rotulo, padrao) => {
+    const percentual = Number(rotulo?.match(padrao)?.[1]?.replaceAll(".", "").replace(",", "."));
+    return Number.isFinite(percentual) ? 1 + percentual / 100 : 1;
+  };
+  const bonus = [...document.querySelectorAll("#active-boosts:not([hidden]) button:not([hidden])")]
+    .map(botao => botao.hasAttribute("data-live-xp-badge") ? "live" : botao.title.split(" · ")[0]).sort();
+  const eventos = [];
+  let global = 1;
+  let beta = 1;
+  for (const botao of document.querySelectorAll("#global-boost-events:not([hidden]) button[data-global-boost-event]:not([hidden])")) {
+    const efeitos = [...botao.querySelectorAll("[data-global-boost-kind]")];
+    eventos.push([botao.dataset.globalBoostEvent, efeitos.map(no => no.textContent.trim())]);
+    for (const efeito of efeitos) {
+      const multiplicador = fator(efeito.textContent, /\+([\d.,]+)%/);
+      if (efeito.dataset.globalBoostKind === "xp") global = Math.max(global, multiplicador);
+      if (efeito.dataset.globalBoostKind === "betaXp") beta = Math.max(beta, multiplicador);
+    }
+  }
+  const dia = document.querySelector("#global-boost-events:not([hidden]) button[data-daily-type]:not([hidden])");
+  const tipoDia = dia?.dataset.dailyType ?? "";
+  const fatorDia = fator(dia?.getAttribute("aria-label"), /\+([\d.,]+)% de XP\b/);
+  const nomeDia = dia?.querySelector(".global-boost-event-label")?.textContent.trim() || `Tipo do Dia (${tipoDia})`;
+  const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
+  const pessoal = Math.max(1, ...bonus.map(rotulo => fator(rotulo, /\+([\d.,]+)% de XP do treinador\b/)));
+  const live = bonus.includes("live") ? 1.1 : 1;
+  return { bonus, eventos, tipoDia, nomeDia, fatorDia, vip, pessoal, live, global, beta };
+}
+
 function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
   const LIMITE_HUNTS = 12;
   const TTL = 15 * 60_000;
@@ -121,21 +150,30 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     return fichas.get(hunt.url);
   }
 
-  function xpPorAbate(hunt, baseXp, vip) {
+  async function xpPorAbate(hunt, baseXp, bonus, tipos) {
     if (!baseXp || !(hunt.fatorXp > 0) || !(hunt.compensacaoXp > 0) || !hunt.encontros.length) return NaN;
+    const { vip, pessoal, live, global, beta, tipoDia, fatorDia } = bonus;
+    const fatorBase = vip ? 1.4 : 0.7;
+    const usarTipoDia = tipoDia && fatorDia > 1;
+    const tiposEncontros = usarTipoDia
+      ? await Promise.all(hunt.encontros.map(({ id }) => combate.carregarTipos(id, tipos))) : [];
+    if (tiposEncontros.some(tipos => !tipos)) return NaN;
     let total = 0;
     let pesoTotal = 0;
-    for (const { id, peso } of hunt.encontros) {
+    for (const [i, { id, peso }] of hunt.encontros.entries()) {
       const base = baseXp.get(id);
       if (!(peso > 0) || !base) return NaN;
-      total += peso * Math.max(1, Math.round(base * hunt.fatorXp * hunt.compensacaoXp * (vip ? 1.4 : 0.7)));
+      const bonusEncontro = tiposEncontros[i]?.includes(tipoDia) ? fatorDia : 1;
+      const xp = base * hunt.fatorXp * hunt.compensacaoXp * fatorBase * pessoal * live * global * beta * bonusEncontro;
+      total += peso * Math.max(1, Math.round(xp));
       pesoTotal += peso;
     }
     return total / pesoTotal;
   }
 
-  async function classificar(nivel, niveisEquipe, vip, membros, golpesAtivos, slugAtual) {
+  async function classificar(nivel, niveisEquipe, bonus, membros, golpesAtivos, slugAtual) {
     const { hunts, xp } = await carregarCatalogo();
+    const { vip, tipoDia, fatorDia } = bonus;
     const nivelEquipe = Math.min(...niveisEquipe);
     const referencia = Math.min(nivel, niveisEquipe.reduce((soma, lv) => soma + lv, 0) / niveisEquipe.length);
     const elegiveis = hunts.filter(hunt => hunt.nivel <= nivel && hunt.nivel - nivelEquipe <= 199 &&
@@ -150,18 +188,21 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       }
     }
     const selecionadas = [...candidatas];
+    const tipos = xp && selecionadas.length && tipoDia && fatorDia > 1 ? (await combate.carregarIndice())?.tipos : null;
     const dados = [];
     let falhas = 0;
     for (let i = 0; i < selecionadas.length; i += 4) {
       const lote = await Promise.all(selecionadas.slice(i, i + 4).map(fichaComCache));
+      const validas = [];
       for (const hunt of lote) {
         if (!hunt || !Number.isSafeInteger(hunt.nivelMinimo)) {
           falhas++;
           continue;
         }
-        if (hunt.nivelMinimo > nivelEquipe) continue;
-        dados.push({ ...hunt, xp: xpPorAbate(hunt, xp, vip) });
+        if (hunt.nivelMinimo <= nivelEquipe) validas.push(hunt);
       }
+      const estimativas = await Promise.all(validas.map(async hunt => ({ ...hunt, xp: await xpPorAbate(hunt, xp, bonus, tipos) })));
+      dados.push(...estimativas);
     }
     const equipe = dados.length && await combate.carregarEquipe(membros, niveisEquipe, golpesAtivos);
     if (equipe) {
@@ -227,10 +268,15 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     if (lista.textContent !== comparacao) lista.textContent = comparacao;
   }
 
-  return function recomendar(equipe, golpesAtivos, medicao, slugAtual) {
+  return function recomendar(equipe, golpesAtivos, medicao, slugAtual, bonus) {
     const nivel = numero(texto(document, "#trainer-level-small").match(/^Lv\. ([\d.]+)$/)?.[1]);
     const niveisEquipe = equipe?.membros.map(membro => numero(membro.nivel.match(/^Lv\. ([\d.]+)$/)?.[1]));
-    const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
+    const { vip, pessoal, live, global, beta, tipoDia, nomeDia, fatorDia } = bonus;
+    const ativos = [["VIP", vip ? 2 : 1], ["XP Boost", pessoal], ["Live", live],
+      ["Evento de XP", global], ["Beta XP", beta], [nomeDia, tipoDia ? fatorDia : 1]]
+      .filter(([, fator]) => fator > 1).map(([nome, fator]) => `${nome} ×${casasDecimais.format(fator)}`);
+    const rotuloBonus = ativos.length ? `Bônus de XP ativos · ${ativos.join(" · ")}` : "Sem bônus de XP ativos.";
+    if (campo("hunt-bonus-xp").textContent !== rotuloBonus) campo("hunt-bonus-xp").textContent = rotuloBonus;
     if (!Number.isSafeInteger(nivel) || nivel < 1 || !niveisEquipe?.every(lv => Number.isSafeInteger(lv) && lv > 0)) {
       consulta = undefined;
       campo("hunt-estimativa-xp").textContent = "Aguardando níveis";
@@ -240,7 +286,8 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       return;
     }
 
-    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, vip, golpesAtivos, slugAtual]);
+    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, golpesAtivos, slugAtual,
+      vip, pessoal, live, global, beta, tipoDia, fatorDia]);
     if (consulta?.chave === chave && Date.now() < consulta.expira) {
       consulta.medicao = medicao;
       if (consulta.resultado) apresentar(consulta.resultado, medicao);
@@ -252,7 +299,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     campo("hunt-estimativa-drops").textContent = "Consultando...";
     campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
     campo("hunt-comparacao").textContent = "Consultando as fichas de combate...";
-    void classificar(nivel, niveisEquipe, vip, equipe.membros, golpesAtivos, slugAtual).then(resultado => {
+    void classificar(nivel, niveisEquipe, bonus, equipe.membros, golpesAtivos, slugAtual).then(resultado => {
       if (consulta !== atual) return;
       atual.resultado = resultado;
       if (resultado.falhas || resultado.dados.some(hunt => !hunt.combate || !Number.isFinite(hunt.xp))) {
@@ -365,15 +412,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     if (Number.isSafeInteger(xp) && Number.isSafeInteger(drops)) return { xp, drops };
   }
 
-  function contextoMedicao(equipe, golpesAtivos) {
+  function contextoMedicao(equipe, golpesAtivos, bonusAtivos) {
     if (!equipe || !golpesAtivos.every(Boolean)) return "";
-    const bonus = [...document.querySelectorAll("#active-boosts:not([hidden]) button")]
-      .map(botao => botao.hasAttribute("data-live-xp-badge") ? "live" : botao.title.split(" · ")[0]).sort();
-    const eventos = [...document.querySelectorAll("#global-boost-events:not([hidden]) button[data-global-boost-event]:not([hidden])")]
-      .map(botao => [botao.dataset.globalBoostEvent, [...botao.querySelectorAll("[data-global-boost-kind]")].map(no => no.textContent.trim())]);
-    const tipoDia = document.querySelector("#global-boost-events button[data-daily-type]:not([hidden])")?.dataset.dailyType;
-    const vip = document.getElementById("trainer-vip-status")?.dataset.active === "true";
-    return JSON.stringify([equipe.membros.map(membro => membro.nivel), golpesAtivos, vip, bonus, eventos, tipoDia ?? ""]);
+    const { vip, bonus, eventos, tipoDia, fatorDia } = bonusAtivos;
+    const contexto = [equipe.membros.map(membro => membro.nivel), golpesAtivos, vip, bonus, eventos, tipoDia];
+    // Mantém as medições do calendário padrão e separa dias com outro bônus de XP.
+    if (tipoDia && fatorDia !== 1.2) contexto.push(fatorDia);
+    return JSON.stringify(contexto);
   }
 
   function consultarHistorico(equipe, contexto) {
@@ -455,20 +500,22 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     const trocaAtiva = trocaHunts.ativa();
     if (!mostraAnalise && !trocaAtiva) return reiniciarJanela();
     const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
-    const contextoAtual = contextoMedicao(equipe, golpesAtivos);
+    const bonus = lerBonusHunts();
+    const contextoAtual = contextoMedicao(equipe, golpesAtivos, bonus);
     const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
     const rendimentos = historicoAtual?.rendimentos;
     const referencia = rendimentos?.find(item => item.area === cacada?.slug);
     if (mostraAnalise) apresentar(equipe, cacada, historicoAtual);
     const slugAtual = trocaAtiva ? cacada?.slug : undefined;
-    const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual) : undefined;
+    const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual, bonus) : undefined;
     if (trocaAtiva) {
-      const contexto = (time, golpes) => JSON.stringify([time, golpes, texto(document, "#trainer-level-small"),
-        contextoMedicao(time, golpes)]);
-      const inicial = contexto(equipe, golpesAtivos);
+      const contexto = (time, golpes, medicao) => JSON.stringify([time, golpes, texto(document, "#trainer-level-small"), medicao]);
+      const inicial = contexto(equipe, golpesAtivos, contextoAtual);
       void trocaHunts.atualizar(historicoAtual && dados, cacada, treinador(), () => {
         const time = equipeAtual();
-        return lerCacada()?.slug === slugAtual && contexto(time, time ? lerGolpesHunts(time.membros) : []) === inicial;
+        if (lerCacada()?.slug !== slugAtual) return false;
+        const golpes = time ? lerGolpesHunts(time.membros) : [];
+        return contexto(time, golpes, contextoMedicao(time, golpes, lerBonusHunts())) === inicial;
       }, rendimentos);
     }
     const atual = sessao;

@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.20**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.21**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -77,7 +77,9 @@ A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do 
 
 Abra **Análise de hunts** para ver estimativas antes de testar uma hunt. A extensão verifica o nível do treinador, os níveis da equipe e o VIP, então compara até 12 hunts regulares próximas do nível da equipe, limitado pelo nível do treinador.
 
-Para XP, a análise pondera a XP base de referência de cada espécie pela sua participação nos encontros e aplica os multiplicadores da hunt. Para drops, usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
+Para XP do treinador, a análise combina a XP base de cada espécie com os multiplicadores da hunt, VIP, XP Boost do treinador, bônus de live, evento global e Beta XP. Aplica o Tipo do Dia só aos encontros em que um dos tipos do selvagem coincide e pondera o ganho pela frequência de cada espécie. A aba mostra os bônus detectados e a estimativa acompanha as mudanças nos bônus ativos. [Regras de XP](https://multipoke.io/pokepedia/guias/progressao) · [Tipo do Dia](https://multipoke.io/pokepedia/guias/tipo-do-dia) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
+
+Para drops, a análise usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts)
 
 Em **Comparar hunts e golpes**, cada hunt tem um resumo do ritmo para a equipe atual, dos destaques de XP e drops e de limitações de combate relevantes. O modelo usa os golpes equipados e estima até quatro golpes dos selvagens pelo nível típico da faixa de encontro. Compara tipos, STAB, fraquezas, resistências, imunidades, poder, precisão e recarga. Usa atributos de referência e golpes de poder fixo. Críticos, efeitos, dano variável, área, genes e bônus individuais podem mudar o resultado no jogo. [Guia de combate](https://multipoke.io/pokepedia/guias/combate)
 
@@ -89,7 +91,7 @@ O IndexedDB da extensão mantém as **10 janelas mais recentes** e os recordes d
 
 ## Troca de hunt
 
-Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. Quando as duas hunts comparadas têm medições para a configuração atual, divide o ganho total das janelas recentes pelo tempo observado. Para pares sem medições comparáveis, usa o rendimento estimado. A estimativa de drops considera o valor de itens comuns vendidos ao NPC.
+Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. Quando as duas hunts comparadas têm medições para a configuração atual, divide o ganho registrado pelo jogo pelo tempo observado. Para pares sem medições comparáveis, usa o rendimento estimado com os bônus ativos de XP ou o valor de itens comuns vendidos ao NPC, conforme a prioridade escolhida.
 
 A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro minuto da caçada, exige que a aba do jogo esteja em foco e respeita um intervalo de **5 minutos** entre tentativas de entrada. Pode continuar com o painel recolhido. A ativação dura até pausar, trocar de treinador ou recarregar a aba.
 
@@ -150,6 +152,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.21 | Análise e troca de hunts consideram os bônus ativos no cálculo de XP do treinador. |
 | 1.5.20 | A Auto Loja retoma após recarga ou reconexão e adia apenas as operações afetadas por falhas. |
 | 1.5.19 | Catálogo e histórico no IndexedDB, backup em JSON e troca de hunt com medições comparáveis. |
 | 1.5.18 | Aba para trocar de hunt automaticamente com prioridade de XP ou drops. |

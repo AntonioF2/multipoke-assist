@@ -135,15 +135,28 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     ]));
   }
 
+  function carregarIndice() {
+    indice ??= cacheDadosHunts("indice-especies-v2", async () => {
+      const paginaEspecies = await pagina("/pokepedia/pokemon");
+      return [...paginaEspecies.querySelectorAll("article[data-filter-name][data-filter-number]")].map(no => ({
+        nome: nomeCombateHunts(no.dataset.filterName), id: no.dataset.filterNumber,
+        tipos: (no.dataset.filterType ?? "").split(",").map(tipo => tipo.trim()),
+      }));
+    }, linhas => linhas.length > 0).then(linhas => ({
+      nomes: new Map(linhas.map(({ nome, id }) => [nome, id])),
+      tipos: new Map(linhas.filter(({ tipos }) => tipos.every(tipo => relacoesHunts[tipo]))
+        .map(({ id, tipos }) => [id, tipos])),
+    })).catch(() => { indice = undefined; return null; });
+    return indice;
+  }
+
+  async function carregarTipos(id, tipos) {
+    return tipos?.get(id) ?? (await carregarEspecie(id))?.tipos;
+  }
+
   async function carregarEquipe(membros, niveis, golpesAtivos) {
     if (golpesAtivos.some(golpes => !golpes)) return null;
-    indice ??= cacheDadosHunts("indice-especies", async () => {
-      const paginaEspecies = await pagina("/pokepedia/pokemon");
-      return [...paginaEspecies.querySelectorAll("article[data-filter-name][data-filter-number]")].map(no => [
-        nomeCombateHunts(no.dataset.filterName), no.dataset.filterNumber,
-      ]);
-    }, linhas => linhas.length > 0).then(linhas => new Map(linhas)).catch(() => { indice = undefined; return null; });
-    const nomes = await indice;
+    const nomes = (await carregarIndice())?.nomes;
     if (!nomes) return null;
     const equipe = await Promise.all(membros.map(async (membro, i) => {
       const nome = nomeCombateHunts(membro.nome);
@@ -228,5 +241,5 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     return { custo, pressaoAlta: Number.isFinite(custo) && custo >= 1.25 * custoBase };
   }
 
-  return { carregarEquipe, comparar, limparCache };
+  return { carregarIndice, carregarTipos, carregarEquipe, comparar, limparCache };
 }

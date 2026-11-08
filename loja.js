@@ -230,7 +230,8 @@
         <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
         <p id="hunt-atual"></p>
         <h3>Estimativas para seu nível</h3>
-        <div class="hunt-resumo"><strong>Melhor estimativa de XP</strong><span id="hunt-estimativa-xp"></span></div>
+        <div class="hunt-resumo"><strong>Melhor estimativa de XP do treinador</strong><span id="hunt-estimativa-xp"></span></div>
+        <p><small id="hunt-bonus-xp"></small></p>
         <div class="hunt-resumo"><strong>Melhor estimativa de drops</strong><span id="hunt-estimativa-drops"></span></div>
         <p><small id="hunt-estimativa-status"></small></p>
         <details class="regras">
