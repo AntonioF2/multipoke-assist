@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.19**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.20**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -36,7 +36,7 @@ A extensão procura o botão **Capturar** nos painéis normal e de economia e ac
 
 Se você selecionar uma Poké Bola para reposição, a Autocaptura acompanha o estoque dessa bola mesmo com a Auto Loja pausada ou com o painel recolhido. Ela aguarda quando o estoque chega a zero e retoma assim que a mochila volta a ter pelo menos uma unidade. Para capturar sem esse controle de estoque, escolha **Sem reposição** no campo **Poké Bola**.
 
-Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O comando `multiPokeCaptura.parar()` no console também pode desligá-la. Ao recarregar a página, a Autocaptura volta a iniciar e o painel carrega com o botão **Iniciar Auto Loja** disponível.
+Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O comando `multiPokeCaptura.parar()` no console também pode desligá-la. Ao recarregar a página, a Autocaptura volta a iniciar.
 
 ## Reposição de Poké Bolas e poções
 
@@ -71,7 +71,7 @@ Antes de uma venda automática, a Auto Loja limpa as marcações existentes na l
 
 Com qualidade abaixo de **1,30** e IV total abaixo de **80**, o modo **E** exige os dois limites e o modo **OU** exige pelo menos um. Um Pokémon com qualidade exatamente **1,30** só pode passar pelo critério de IV. O mesmo vale para IV exatamente **80** em relação ao critério de qualidade.
 
-A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do treinador em qualquer hunt ativa, priorizando as capturas mais antigas. Durante a venda automática, aplica os critérios do Auto Loja e restaura os filtros manuais da loja ao terminar. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny e Holo ficam protegidos, assim como os de qualidade **Lendária ou superior** (a partir de **1,70**). Se houver Pokémon selecionados manualmente na loja, o Auto Loja pausa antes de vender.
+A extensão vende até **20 Pokémon por venda**. Ela percorre o inventário do treinador em qualquer hunt ativa, priorizando as capturas mais antigas. Durante a venda automática, aplica os critérios do Auto Loja e restaura os filtros manuais da loja ao terminar. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny e Holo ficam protegidos, assim como os de qualidade **Lendária ou superior** (a partir de **1,70**). Uma seleção manual de Pokémon adia só a venda de Pokémon até que a seleção seja limpa.
 
 ## Análise de hunts
 
@@ -95,10 +95,9 @@ A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro min
 
 ## Quando o Auto Loja funciona
 
-- Com o painel aberto e a aba em foco, o estoque é lido a cada **5 segundos**, quando a loja está disponível.
-- Durante a caçada, com a aba do jogo em foco, a reposição verifica o estoque a cada **5 segundos** e as vendas rodam a cada **30 segundos**. O painel pode ficar recolhido depois que você iniciar.
-- A Poké Bola, a poção, os valores de reposição, as regras de loot e os filtros de Pokémon ficam salvos por treinador no navegador. Ao reabrir, escolha o modo de venda de loot ou marque a venda de Pokémon novamente e inicie o Auto Loja.
-- O painel pausa se o jogo apresentar uma confirmação diferente da seleção esperada ou se a operação ficar sem comprovante. Confira o inventário e o saldo antes de iniciar novamente.
+- Com a aba visível e o jogo disponível, a reposição verifica o estoque a cada **5 segundos** e as vendas a cada **30 segundos**. O painel pode ficar recolhido. Se o Chrome ocultar a aba, a Auto Loja fica **Aguardando** e retoma quando a aba reaparece.
+- Recarregar a mesma aba retoma a configuração ativa para o mesmo treinador. Uma pausa manual ou uma troca de treinador encerra a sessão.
+- Uma confirmação divergente ou ausente adia a operação afetada. Antes de tentar novamente, a extensão espera a atualização da loja e confere os itens, o estoque e os valores.
 
 ## Como atualizar
 
@@ -108,7 +107,7 @@ Na instalação em modo de desenvolvimento, siga estes passos.
 
 1. Atualize os arquivos na pasta que o Chrome carrega. Se você clonou o repositório, abra a branch `main` com `git switch main` e execute `git pull --ff-only` dentro da pasta do projeto. Se usou ZIP, baixe e extraia a versão nova na pasta da extensão.
 2. Em `chrome://extensions`, clique em **Recarregar** no cartão **MultiPoke Autocaptura** e confira a versão.
-3. Atualize a aba do jogo para carregar a Autocaptura e o painel automaticamente. Para ativar as compras e vendas, clique em **Iniciar Auto Loja** no painel.
+3. Atualize a aba do jogo para carregar a Autocaptura e o painel automaticamente. Para iniciar uma sessão de compras e vendas, clique em **Iniciar Auto Loja** no painel.
 
 Se o painel não aparecer, confira se você carregou a versão completa, se a aba está em `multipoke.io/jogar` e se a extensão está instalada no mesmo perfil do Chrome.
 
@@ -151,6 +150,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.20 | A Auto Loja retoma após recarga ou reconexão e adia apenas as operações afetadas por falhas. |
 | 1.5.19 | Catálogo e histórico no IndexedDB, backup em JSON e troca de hunt com medições comparáveis. |
 | 1.5.18 | Aba para trocar de hunt automaticamente com prioridade de XP ou drops. |
 | 1.5.17 | Resumo curto por hunt com o ritmo e os destaques para a equipe atual. |

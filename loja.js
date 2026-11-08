@@ -71,6 +71,9 @@
   const QUALIDADE_LENDARIA = 1.70;
   const INTERVALO_VENDA = 30_000;
   const INTERVALO_ESTOQUE = 5_000;
+  const PRAZO_COMPROVANTE = 15_000;
+  const ESPERA_OPERACAO_INCERTA = 60_000;
+  const chaveSessao = "multipoke.auto-loja.sessao";
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
   const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
   const normalizar = texto => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -123,6 +126,8 @@
         background: #5f0715; border: 1px solid #ffb4bf; }
       #estado[data-ativa]::before { background: #54ff72; border-color: #ceffd5;
         box-shadow: 0 0 7px #54ff72; }
+      #estado[data-aguardando]::before { background: var(--amarelo); border-color: #fff5d6;
+        box-shadow: none; }
       #abas { display: flex; gap: 6px; margin: 9px 12px 6px; }
       #abas button { flex: 1; border: 1px solid #a6b7d0; border-radius: 6px; padding: 5px 6px;
         background: #edf3ff; color: var(--azul); font-weight: 700; }
@@ -306,9 +311,15 @@
   let estoqueLido = false;
   let treinadorConfigurado = "";
   let interacoes = 0;
+  let interacoesMochila = 0;
+  let ultimaInteracao = -Infinity;
+  const prazosTemporarios = new Map();
   for (const evento of ["pointerdown", "keydown"]) {
     document.addEventListener(evento, event => {
-      if (event.isTrusted) interacoes++;
+      if (!event.isTrusted) return;
+      interacoes++;
+      ultimaInteracao = performance.now();
+      if (event.target.closest?.("#drawer, #nav-bag")) interacoesMochila++;
     }, { capture: true, passive: true });
   }
 
@@ -510,24 +521,26 @@
   function comLoja(abertaPeloUsuario, executar) {
     const aberta = Boolean(loja());
     const inicio = interacoes;
+    const inicioMochila = interacoesMochila;
     const foco = interfaceLoja.activeElement ?? document.activeElement;
-    if (!jogo("#game-shell:not([inert])") || modal() ||
-        jogo("#starter-overlay:not([hidden]), #hunt-map-overlay:not([hidden])") ||
+    if (!jogoDisponivel() || modal() ||
         (jogo("#drawer.open") && !(abertaPeloUsuario && aberta))) return;
-    if (!aberta) jogo("#nav-bag:not(:disabled)")?.click();
-    if (!loja()) return;
-    return Promise.resolve().then(() => executar(aberta)).finally(() => {
-      if (!aberta && inicio === interacoes && loja() && !modal()) {
-        jogo("#drawer-close")?.click();
-        if (foco?.isConnected) foco.focus({ preventScroll: true });
+    const gaveta = jogo("#drawer");
+    const abrir = jogo("#nav-bag:not(:disabled)");
+    if (!aberta) abrir?.click();
+    return Promise.resolve().then(() => loja() && executar(aberta)).finally(() => {
+      if (!aberta && inicioMochila === interacoesMochila && gaveta?.matches(".open") && !modal() &&
+          (gaveta.classList.contains("bag-drawer") || abrir?.getAttribute("aria-expanded") === "true")) {
+        gaveta.querySelector("#drawer-close")?.click();
+        if (inicio === interacoes && foco?.isConnected) foco.focus({ preventScroll: true });
       }
     });
   }
 
   function confirmar(dialogo, titulo, rotulo, conferir) {
+    if (!dialogo?.matches(".ui-confirm") || texto(dialogo, "h2") !== titulo) return false;
     const botao = dialogo?.querySelector("button[data-confirm-accept]:not(:disabled)");
-    if (!botao || !dialogo.matches(".ui-confirm") || texto(dialogo, "h2") !== titulo) return false;
-    if (botao.textContent.trim() !== rotulo || !conferir(dialogo)) {
+    if (!botao || botao.textContent.trim() !== rotulo || !conferir(dialogo)) {
       dialogo.querySelector("button[data-confirm-cancel]")?.click();
       return false;
     }
@@ -535,31 +548,51 @@
     return true;
   }
 
-  function comprovante(disparar, confere, atualizou) {
+  function confirmacaoOculta(tipo) {
+    try { return localStorage.getItem(`multipoke-hide-sale-confirmation:${tipo}`) === "true"; }
+    catch { return false; }
+  }
+
+  function comprovante(reservar, disparar, confere, atualizou) {
     return new Promise((resolve, reject) => {
-      const area = jogo("#toast-area");
+      let area = jogo("#toast-area");
       if (!area) return reject(new Error("Área de comprovantes da loja indisponível."));
       let recebido = false;
+      const lerAviso = no => {
+        if (no.matches?.(".toast.good") && confere(no.textContent.trim())) recebido = true;
+      };
       const terminar = erro => {
         clearInterval(checagem);
         clearTimeout(prazo);
         observador.disconnect();
         if (erro) reject(erro);
-        else resolve();
+        else resolve(recebido);
       };
       const observador = new MutationObserver(mudancas => {
         for (const mudanca of mudancas) {
-          for (const no of mudanca.addedNodes) {
-            if (no.matches?.(".toast.good") && confere(no.textContent.trim())) recebido = true;
-          }
+          for (const no of mudanca.addedNodes) lerAviso(no);
         }
       });
       const checagem = setInterval(() => {
-        if (recebido && loja() && atualizou()) terminar();
+        try {
+          const atual = jogo("#toast-area");
+          if (atual && atual !== area) {
+            observador.disconnect();
+            area = atual;
+            for (const no of area.children) lerAviso(no);
+            observador.observe(area, { childList: true });
+          }
+          if (recebido && loja() && atualizou()) terminar();
+        } catch { /* A loja pode estar sendo redesenhada. */ }
       }, 100);
-      const prazo = setTimeout(() => terminar(new Error("O jogo não confirmou a operação e o estoque. Confira a loja antes de retomar.")), 6000);
+      const prazo = setTimeout(() => {
+        const erro = new Error(recebido ? "Operação confirmada. Aguardando a atualização do estoque."
+          : "Operação sem comprovante. Aguardando antes de conferir o estoque novamente.");
+        terminar(erro);
+      }, PRAZO_COMPROVANTE);
       observador.observe(area, { childList: true });
       try {
+        reservar();
         const enviada = disparar();
         if (enviada === null) terminar(); // Operação adiada antes de ser enviada.
         else if (!enviada) terminar(new Error("A confirmação da loja divergiu dos itens ou valores esperados."));
@@ -567,7 +600,7 @@
     });
   }
 
-  async function comprar(regra, reserva) {
+  async function comprar(regra, reserva, reservar) {
     abaLoja("shop");
     const item = produtos().find(item => item.id === regra.id);
     if (!item) throw new Error("O produto escolhido não aparece mais na loja.");
@@ -594,7 +627,7 @@
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
     const pedido = `${formatar(regra.qtd)}× ${item.nome}`;
-    await comprovante(() => {
+    const concluida = await comprovante(reservar, () => {
       try {
         alterar(String(regra.qtd));
         const limite = numero(item.linha.querySelector("[data-shop-slider]")?.max);
@@ -618,10 +651,10 @@
       } finally { if (input.isConnected) alterar(anterior); }
     }, mensagem => mensagem === `Compra concluída: ${pedido} por ${formatar(custo)} Pokédollars.`,
     () => produtos().some(atual => atual.id === item.id && atual.estoque > item.estoque));
-    return aviso ?? `Comprou ${pedido}`;
+    return aviso ?? (concluida ? `Comprou ${pedido}` : undefined);
   }
 
-  async function vender(modo) {
+  async function vender(modo, reservar) {
     abaLoja("loot");
     const permitido = item => item && lootPermitido(item.chave, modo, item.preco);
     const alvo = new Set(pilhas().filter(permitido).map(item => item.chave));
@@ -646,11 +679,11 @@
       const quantidade = itens.reduce((soma, item) => soma + item.qtd, 0);
       if (!Number.isSafeInteger(total) || !Number.isSafeInteger(quantidade)) throw new Error("Total da venda inválido.");
       const botao = loja().querySelector("[data-bulk-sell-loot]:not(:disabled)");
-      await comprovante(() => {
+      const concluida = await comprovante(reservar, () => {
         if (!botao || modal()) return false;
         botao.click();
         const dialogo = modal();
-        if (!dialogo) return true; // O jogo permite ocultar a confirmação de loot.
+        if (!dialogo) return confirmacaoOculta("loot");
         return confirmar(dialogo, "Confirmar venda de loot", "Vender", dialogo => {
           const revisao = [...dialogo.querySelectorAll(".ui-confirm__items strong")].map(no => no.textContent.trim()).sort();
           const esperado = itens.map(item => `${item.nome} ×${formatar(item.qtd)}`).sort();
@@ -659,7 +692,7 @@
         });
       }, mensagem => mensagem === `${formatar(quantidade)} itens vendidos por ${formatar(total)} Pokédollars.`,
       () => itens.every(item => !pilhas().some(atual => atual.chave === item.chave && atual.estoque >= item.estoque)));
-      return `${formatar(quantidade)} loots por ${formatar(total)} Pokédollars`;
+      if (concluida) return `Vendeu ${formatar(quantidade)} loots por ${formatar(total)} Pokédollars`;
     } finally {
       if (inicio === interacoes && !modal()) limpar()?.click();
     }
@@ -706,7 +739,7 @@
     };
   }
 
-  async function venderPokemon(filtro, continua) {
+  async function venderPokemon(filtro, continua, reservar) {
     const layout = loja();
     const abaAnterior = layout.dataset.mode === "tabs" ? layout.dataset.activeTab
       : layout.querySelector('[data-bag-sale-tab][aria-selected="true"]')?.dataset.bagSaleTab;
@@ -730,7 +763,7 @@
     let restaurarFiltros;
     layout.addEventListener("click", registrarSelecaoManual, true);
     try {
-      if (limpar() || caixas().length) throw new Error("Há Pokémon selecionados manualmente na loja. Limpe a seleção antes de retomar.");
+      if (limpar() || caixas().length) return "Venda de Pokémon aguardando a limpeza da seleção manual";
       restaurarFiltros = suspenderFiltrosPokemon(layout);
       // A ordem padrão da loja é do mais recente para o mais antigo.
       if (rolagem.scrollHeight > rolagem.clientHeight) {
@@ -773,9 +806,9 @@
       for (const { faixa } of lote.values()) faixas.set(faixa, (faixas.get(faixa) ?? 0) + 1);
       const esperado = new Map([["Pokémon na venda", quantidade], ["Total", `$ ${formatar(preco)}`]]);
       for (const [faixa, quantidade] of faixas) esperado.set(faixa, formatar(quantidade));
-      await comprovante(() => {
-        if (!continuaVenda()) return false;
-        const semDialogo = localStorage.getItem("multipoke-hide-sale-confirmation:pokemon") === "true";
+      const concluida = await comprovante(reservar, () => {
+        if (!continuaVenda()) return null;
+        const semDialogo = confirmacaoOculta("pokemon");
         botao.click();
         const dialogo = modal();
         if (!dialogo) return semDialogo;
@@ -786,7 +819,7 @@
         });
       }, mensagem => mensagem === `${quantidade} Pokémon vendidos por ${formatar(preco)} Pokédollars.`,
       () => !limpar() && !caixas().length);
-      return `${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
+      if (concluida) return `Vendeu ${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
     } finally {
       layout.removeEventListener("click", registrarSelecaoManual, true);
       if (layout.isConnected && treinador() === treinadorDaVenda && !modal()) {
@@ -800,74 +833,162 @@
     }
   }
 
-  function atualizarIndicador() {
+  function jogoDisponivel() {
+    return navigator.onLine && jogo("#game-shell:not([inert])") &&
+      !jogo("#connection-screen:not([hidden]), #starter-overlay:not([hidden]), #hunt-map-overlay:not([hidden]), body.pvp-mode");
+  }
+
+  function atualizarIndicador(aguardando = false) {
     const ativo = Boolean(sessao);
-    campo("estado").toggleAttribute("data-ativa", ativo);
-    campo("estado").textContent = ativo ? "Ativa" : "Offline";
+    const estado = campo("estado");
+    estado.toggleAttribute("data-ativa", ativo);
+    estado.toggleAttribute("data-aguardando", ativo && aguardando);
+    estado.textContent = !ativo ? "Offline" : aguardando ? "Aguardando" : "Ativa";
+  }
+
+  function lerSessao() {
+    try {
+      const salva = JSON.parse(sessionStorage.getItem(chaveSessao));
+      if (!salva || typeof salva.treinador !== "string" || !salva.treinador ||
+          !Array.isArray(salva.compras) || salva.compras.length > 2 ||
+          !["", "baratos", "marcados"].includes(salva.modoVenda) ||
+          !inteiro(salva.reserva, 0, 999_999_999)) return null;
+      const { compras, modoVenda, filtroPokemon } = salva;
+      if (!compras.length && !modoVenda && !filtroPokemon) return null;
+      if (compras.some(regra => !regra || !/^(ball|supply):\d+$/.test(regra.id) ||
+          !inteiro(regra.minimo, 0, 10_000) || !inteiro(regra.qtd, 1, 10_000))) return null;
+      if (filtroPokemon && (!["e", "ou"].includes(filtroPokemon.condicao) ||
+          (filtroPokemon.qualidade === null && filtroPokemon.iv === null) ||
+          (filtroPokemon.qualidade !== null && !(filtroPokemon.qualidade > 0 && filtroPokemon.qualidade <= QUALIDADE_LENDARIA)) ||
+          (filtroPokemon.iv !== null && !inteiro(filtroPokemon.iv, 6, 193)))) return null;
+      return salva;
+    } catch { return null; }
+  }
+
+  function definirSessao(configuracao) {
+    sessao = configuracao && { ...configuracao, proximas: new Map(), avisos: new Map() };
+    try {
+      if (configuracao) sessionStorage.setItem(chaveSessao, JSON.stringify(configuracao));
+      else sessionStorage.removeItem(chaveSessao);
+    } catch { /* A configuração permanece ativa nesta página. */ }
+    atualizarIndicador();
+    campo("alternar").textContent = sessao ? "Pausar Auto Loja" : "Iniciar Auto Loja";
+    campo("config").disabled = Boolean(sessao) || ocupada;
   }
 
   function pausar(mensagem) {
-    sessao = null;
-    atualizarIndicador();
-    campo("alternar").textContent = "Iniciar Auto Loja";
-    campo("config").disabled = ocupada;
+    definirSessao(null);
     informar(mensagem);
+  }
+
+  function aguardar(mensagem) {
+    atualizarIndicador(true);
+    informar(mensagem);
+  }
+
+  const chavePrazo = (atual, operacao) => `multipoke.auto-loja.prazo.${JSON.stringify([atual.treinador, operacao])}`;
+
+  function lerPrazo(chave) {
+    let salvo;
+    try { salvo = Number(localStorage.getItem(chave)); } catch { /* Consulta a cópia desta página. */ }
+    return Math.max(prazosTemporarios.get(chave) ?? 0, Number.isSafeInteger(salvo) ? salvo : 0);
+  }
+
+  function salvarPrazo(chave, prazo) {
+    prazosTemporarios.set(chave, prazo);
+    try { localStorage.setItem(chave, String(prazo)); } catch { /* O prazo continua valendo nesta página. */ }
+  }
+
+  async function operar(atual, operacao, rotulo, intervalo, executar) {
+    const agora = Date.now();
+    const chave = chavePrazo(atual, operacao);
+    if (agora < (atual.proximas.get(operacao) ?? 0) || agora < lerPrazo(chave)) return;
+    let reservou = false;
+    try {
+      const aviso = await executar(() => {
+        salvarPrazo(chave, Date.now() + PRAZO_COMPROVANTE + ESPERA_OPERACAO_INCERTA);
+        reservou = true;
+      });
+      atual.avisos.delete(operacao);
+      if (reservou) salvarPrazo(chave, agora + intervalo);
+      if (aviso) atual.avisos.set(operacao, aviso);
+    } catch (erro) {
+      atual.avisos.set(operacao, `${rotulo} · ${erro?.message || "Aguardando nova tentativa."}`);
+    } finally {
+      atual.proximas.set(operacao, agora + intervalo);
+    }
   }
 
   async function ciclo() {
     const atual = sessao;
-    if (!atual || ocupada || trocaHunts.emTroca() || !document.hasFocus() || document.hidden) return;
+    if (!atual || ocupada) return;
+    if (document.hidden) return aguardar("Aguardando a aba do jogo voltar a ficar visível.");
+    const nome = treinador();
+    if (!nome || !jogoDisponivel()) return aguardar("Aguardando o jogo e o treinador voltarem a ficar disponíveis.");
+    if (nome !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
+    sincronizarTreinador(nome);
+    if (trocaHunts.emTroca()) return aguardar("Aguardando a conclusão da troca de hunt.");
+    if (modal() || jogo("#drawer.open")) return aguardar("Aguardando o fechamento do menu ou da janela do jogo.");
+    const foco = interfaceLoja.activeElement ?? document.activeElement;
+    if (foco?.matches("input, textarea, select, [contenteditable='true']")) {
+      return aguardar("Aguardando o término da interação com o jogo.");
+    }
+    if (performance.now() - ultimaInteracao < 1500) return;
     const inicio = interacoes;
     const continua = () => sessao === atual && treinador() === atual.treinador &&
-      inicio === interacoes && document.hasFocus() && !document.hidden && jogo("#game-shell:not([inert])");
-    if (treinador() !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
-    const vendaDevida = Date.now() >= atual.proximaVenda;
+      inicio === interacoes && !document.hidden && jogoDisponivel();
     const compras = cacada() ? atual.compras : [];
-    const modoVenda = vendaDevida && cacada() && atual.modoVenda;
-    const filtroPokemon = vendaDevida && huntAtiva() && atual.filtroPokemon;
-    if (!continua() || (!compras.length && !modoVenda && !filtroPokemon)) return atualizarEstoque();
+    const modoVenda = cacada() && atual.modoVenda;
+    const filtroPokemon = huntAtiva() && atual.filtroPokemon;
+    if (!compras.length && !modoVenda && !filtroPokemon) return aguardar("Aguardando uma caçada compatível com as operações escolhidas.");
+    if (modoVenda && !catalogo && Date.now() >= proximaConsultaCatalogo) {
+      void carregarCatalogo().then(mostrarCatalogo).catch(() => {});
+    }
+    atualizarIndicador();
+    const agora = Date.now();
+    const devida = operacao => agora >= (atual.proximas.get(operacao) ?? 0) &&
+      agora >= lerPrazo(chavePrazo(atual, operacao));
+    const comprasDevidas = compras.filter(regra => devida(regra.id));
+    const lootDevido = modoVenda && catalogo && devida("loot");
+    const pokemonDevido = filtroPokemon && devida("pokemon");
+    if (!comprasDevidas.length && !lootDevido && !pokemonDevido) {
+      if (modoVenda && !catalogo) informar("Aguardando o catálogo de loot.");
+      return;
+    }
     ocupada = true;
     try {
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
         if (!lock || !continua()) return;
         await comLoja(false, async () => {
-          const resultados = [];
-          for (const regra of compras) {
+          for (const regra of comprasDevidas) {
             if (!continua() || !cacada() || !loja() || modal()) return;
-            const compra = await comprar(regra, atual.reserva);
-            if (compra) resultados.push(compra);
+            const rotulo = regra.id.startsWith("ball:") ? "Reposição de Poké Bolas" : "Reposição de poções";
+            await operar(atual, regra.id, rotulo, INTERVALO_ESTOQUE, reservar => comprar(regra, atual.reserva, reservar));
           }
-          if ((modoVenda || filtroPokemon) && continua() && loja() && !modal()) {
-            atual.proximaVenda = Date.now() + INTERVALO_VENDA;
-            if (modoVenda && cacada()) {
-              const venda = await vender(modoVenda);
-              if (venda) resultados.push(`Vendeu ${venda}`);
-            }
-            if (filtroPokemon && continua() && huntAtiva() && loja() && !modal()) {
-              const venda = await venderPokemon(filtroPokemon, continua);
-              if (venda) resultados.push(`Vendeu ${venda}`);
-            }
+          if (lootDevido && continua() && cacada() && loja() && !modal()) {
+            await operar(atual, "loot", "Venda de loot", INTERVALO_VENDA, reservar => vender(modoVenda, reservar));
+          }
+          if (pokemonDevido && continua() && huntAtiva() && loja() && !modal()) {
+            await operar(atual, "pokemon", "Venda de Pokémon", INTERVALO_VENDA, reservar => venderPokemon(filtroPokemon, continua, reservar));
           }
           if (continua() && loja() && !modal()) {
             mostrarEstoque();
-            informar(resultados.join(" · ") || "Aguardando reposição ou itens elegíveis para venda.");
+            estoqueLido = true;
           }
         });
       });
-    } catch (erro) { pausar(erro.message); }
-    finally {
+      if (sessao === atual) informar([...atual.avisos.values()].join(" · ") ||
+        (modoVenda && !catalogo ? "Aguardando o catálogo de loot." : "Aguardando reposição ou itens elegíveis para venda."));
+    } catch (erro) {
+      if (sessao === atual) aguardar(`Aguardando a loja ficar disponível. ${erro?.message || ""}`.trim());
+    } finally {
       ocupada = false;
       campo("config").disabled = Boolean(sessao);
     }
   }
 
-  async function atualizarEstoque() {
-    if (!campo("painel").open || campo("aba-loja").hidden || ocupada || trocaHunts.emTroca() || document.hidden || !document.hasFocus() ||
-        !jogo("#game-shell:not([inert])")) return;
-    const nome = treinador();
-    if (!nome) return;
+  function sincronizarTreinador(nome) {
     if (treinadorConfigurado !== nome) {
-      if (sessao) pausar("Treinador mudou. Confira as regras antes de retomar.");
       treinadorConfigurado = nome;
       estoqueLido = false;
       estoqueLoot.clear();
@@ -879,10 +1000,34 @@
         try { controle.value = localStorage.getItem(chavePokemon(id)) ?? padrao; }
         catch { controle.value = padrao; }
       }
-      campo("vender-pokemon").checked = false;
-      campo("modo-venda").value = "";
+      const config = sessao?.treinador === nome ? sessao : null;
+      campo("vender-pokemon").checked = Boolean(config?.filtroPokemon);
+      campo("modo-venda").value = config?.modoVenda ?? "";
+      if (config) {
+        for (const regra of config.compras) {
+          const tipo = regra.id.startsWith("ball:") ? "bola" : "pocao";
+          escolhasCompra.set(tipo, regra.id);
+          campo(`${tipo}-min`).value = regra.minimo;
+          campo(`${tipo}-qtd`).value = regra.qtd;
+        }
+        publicarBolaReposicao();
+        campo("reserva").value = config.reserva;
+        if (config.filtroPokemon) {
+          campo("pokemon-qualidade").value = String(config.filtroPokemon.qualidade ?? "").replace(".", ",");
+          campo("pokemon-iv").value = config.filtroPokemon.iv ?? "";
+          campo("pokemon-condicao").value = config.filtroPokemon.condicao;
+        }
+      }
       if (catalogo) mostrarCatalogo();
     }
+  }
+
+  async function atualizarEstoque() {
+    if (!campo("painel").open || campo("aba-loja").hidden || ocupada || trocaHunts.emTroca() || document.hidden ||
+        !jogoDisponivel()) return;
+    const nome = treinador();
+    if (!nome) return;
+    sincronizarTreinador(nome);
     if (!catalogo && Date.now() >= proximaConsultaCatalogo) {
       void carregarCatalogo().catch(() => {}).finally(mostrarCatalogo);
     }
@@ -941,13 +1086,14 @@
     if (ocupada) return;
     if (!estoqueLido || treinador() !== treinadorConfigurado) return informar("Aguarde a leitura automática do estoque.");
     const compras = tiposCompra.map(tipo => ({
-      id: campo(tipo).value,
+      id: escolhasCompra.get(tipo) ?? campo(tipo).value,
       minimo: campo(`${tipo}-min`).valueAsNumber,
       qtd: campo(`${tipo}-qtd`).valueAsNumber,
     })).filter(regra => regra.id);
     const modoVenda = campo("modo-venda").value;
-    if (modoVenda && !catalogo) return informar("Aguarde o catálogo de loot.");
-    if (modoVenda === "marcados" && ![...regrasLoot.keys()].some(chave => lootPermitido(chave, modoVenda))) {
+    const temLootMarcado = [...regrasLoot].some(([chave, regra]) => catalogo ? lootPermitido(chave, modoVenda)
+      : regra === "vender" || regra === "vender-acima-do-limite");
+    if (modoVenda === "marcados" && !temLootMarcado) {
       return informar("Marque os itens de loot que quer vender.");
     }
     let filtroPokemon = null;
@@ -969,13 +1115,20 @@
         compras.some(regra => !inteiro(regra.minimo, 0, 10_000) || !inteiro(regra.qtd, 1, 10_000))) {
       return informar("Confira os números de estoque mínimo, quantidade e reserva.");
     }
-    sessao = { treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva, proximaVenda: 0 };
-    campo("config").disabled = true;
-    atualizarIndicador();
-    campo("alternar").textContent = "Pausar Auto Loja";
+    definirSessao({ treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva: compras.length ? reserva : 0 });
     informar("Ativa durante a caçada. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
     void ciclo();
   });
 
-  setInterval(() => sessao ? ciclo() : atualizarEstoque(), INTERVALO_ESTOQUE);
+  const tentar = () => { if (sessao) void ciclo(); else void atualizarEstoque(); };
+  const salva = lerSessao();
+  if (salva) {
+    definirSessao(salva);
+    aguardar("Retomando a Auto Loja nesta aba.");
+    tentar();
+  }
+  setInterval(tentar, INTERVALO_ESTOQUE);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) tentar(); });
+  window.addEventListener("online", tentar);
+  window.addEventListener("pageshow", tentar);
 })();
