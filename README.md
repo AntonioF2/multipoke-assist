@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.13**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.14**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -22,11 +22,13 @@ git clone https://github.com/AntonioF2/multipoke-autocaptura.git
 ## Como ativar
 
 1. Abra [multipoke.io/jogar](https://multipoke.io/jogar) e entre no jogo.
-2. Ao abrir ou recarregar a página, a Autocaptura inicia e o painel **Auto Loja**, com o Dragonite no cabeçalho, aparece automaticamente.
+2. Ao abrir ou recarregar a página, a Autocaptura inicia e o painel **Auto Loja** carrega com a visibilidade salva.
 3. Clique na **seta** para expandir ou recolher o painel. Segure e arraste a **faixa vermelha** para mover a janela. Com o cabeçalho em foco, as setas do teclado também movem o painel. A posição fica salva no navegador.
 4. Configure as compras e vendas desejadas e clique em **Iniciar Auto Loja**. **Pausar Auto Loja** interrompe as operações e libera os campos para edição.
 
-Para ativar manualmente, use o ícone **MultiPoke Autocaptura** com a aba do jogo selecionada. No Windows, você também pode executar `Ativar Autocaptura.bat` depois de instalar a extensão.
+No menu do ícone **MultiPoke Autocaptura**, use **Ocultar painel** ou **Mostrar painel**. A escolha vale para as abas do MultiPoke nesse perfil do Chrome e fica salva após recarregar. A Autocaptura e a Auto Loja seguem com as operações já ativadas enquanto o painel está oculto.
+
+Para ativar a captura manualmente, escolha **Ligar Autocaptura** no mesmo menu. No Windows, você também pode executar `Ativar Autocaptura.bat` depois de instalar a extensão.
 
 ## Autocaptura
 
@@ -34,7 +36,7 @@ A extensão procura o botão **Capturar** nos painéis normal e de economia e ac
 
 Se você selecionar uma Poké Bola para reposição, a Autocaptura acompanha o estoque dessa bola mesmo com a Auto Loja pausada ou com o painel recolhido. Ela aguarda quando o estoque chega a zero e retoma assim que a mochila volta a ter pelo menos uma unidade. Para capturar sem esse controle de estoque, escolha **Sem reposição** no campo **Poké Bola**.
 
-Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O ícone da extensão também liga a captura, e o comando `multiPokeCaptura.parar()` no console pode desligá-la. Ao recarregar a página, a Autocaptura volta a iniciar e o painel carrega com o botão **Iniciar Auto Loja** disponível.
+Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O comando `multiPokeCaptura.parar()` no console também pode desligá-la. Ao recarregar a página, a Autocaptura volta a iniciar e o painel carrega com o botão **Iniciar Auto Loja** disponível.
 
 ## Reposição de Poké Bolas e poções
 
@@ -150,6 +152,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.14 | Menu no ícone da extensão para mostrar ou ocultar o painel Auto Loja. |
 | 1.5.13 | Estimativas de XP e drops por abate, com seleção de hunts pelo nível do treinador e da equipe. |
 | 1.5.12 | Aba **Análise de hunts** compara XP e drops por hora medidos para a equipe ativa. |
 | 1.5.11 | Pacote e fluxo de publicação de atualizações na Chrome Web Store. |

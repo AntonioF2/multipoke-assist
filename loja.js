@@ -87,13 +87,17 @@
   const huntAtiva = () => Boolean(jogo('#hunt-header[aria-label="Hunt atual"]')) || cacada();
   const modal = () => jogo("dialog[open]");
 
+  const chavePainel = "multipoke.auto-loja.painel-oculto";
   const painel = document.createElement("div");
   painel.id = "multipoke-auto-loja";
+  try { painel.hidden = localStorage.getItem(chavePainel) === "true"; }
+  catch { /* A visibilidade pode ser alterada nesta aba sem armazenamento. */ }
   const interfaceLoja = painel.attachShadow({ mode: "open" });
   interfaceLoja.innerHTML = `
     <style>
       :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: light;
         --azul: #203961; --vermelho: #b92033; --amarelo: #ffcb36; --papel: #fffdf6; }
+      :host([hidden]) { display: none; }
       #painel { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
         background: var(--papel); border: 2px solid var(--azul); border-radius: 12px;
         box-shadow: 0 4px 0 #152641, 0 10px 24px #101d3340; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
@@ -233,6 +237,16 @@
       </section>
     </details>`;
   document.body.append(painel);
+
+  chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
+    if (remetente.id !== chrome.runtime.id || mensagem?.tipo !== "multipoke:visibilidade-painel") return;
+    if (mensagem.alternar === true) {
+      painel.hidden = !painel.hidden;
+      try { localStorage.setItem(chavePainel, String(painel.hidden)); }
+      catch { /* A escolha continua disponível nesta aba. */ }
+    }
+    responder({ visivel: !painel.hidden });
+  });
 
   const campo = id => interfaceLoja.getElementById(id);
   const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar });
@@ -902,6 +916,7 @@
     });
   }
   window.addEventListener("storage", event => {
+    if (event.key === chavePainel) painel.hidden = event.newValue === "true";
     if (!treinadorConfigurado || event.key !== chaveRegras()) return;
     carregarRegras();
     mostrarCatalogo();
