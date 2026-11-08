@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.9**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.10**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome
 
@@ -91,6 +91,7 @@ Se o painel não aparecer, confira se você carregou a versão completa, se a ab
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.10 | A Auto Loja pede a correção de um IV incompleto antes de iniciar a venda de Pokémon. |
 | 1.5.9 | A Auto Loja limpa a seleção de loot antes de marcar os itens autorizados para a venda. |
 | 1.5.8 | Loot elegível abaixo de 10.000 Pokédollars permitido por padrão e opção **Bloquear venda** por item. |
 | 1.5.7 | Regras de loot com a opção **Permitir venda** por item, padrões por modo e autorização individual para itens acima de 100 Pokédollars. |

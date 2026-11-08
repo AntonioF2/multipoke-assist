@@ -845,9 +845,10 @@
     });
   }
   for (const id of camposPokemon) {
-    campo(id).addEventListener("input", () => {
-      if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return;
-      try { localStorage.setItem(chavePokemon(id), campo(id).value); }
+    const controle = campo(id);
+    controle.addEventListener("input", () => {
+      if (!treinadorConfigurado || treinador() !== treinadorConfigurado || !controle.validity.valid) return;
+      try { localStorage.setItem(chavePokemon(id), controle.value); }
       catch { /* A configuração continua disponível nesta aba. */ }
     });
   }
@@ -875,8 +876,9 @@
     if (campo("vender-pokemon").checked) {
       const entradaQualidade = campo("pokemon-qualidade").value.trim();
       const qualidade = entradaQualidade ? Number(entradaQualidade.replace(",", ".")) : null;
-      const iv = campo("pokemon-iv").value ? campo("pokemon-iv").valueAsNumber : null;
-      if ((qualidade === null && iv === null) || (qualidade !== null &&
+      const entradaIv = campo("pokemon-iv");
+      const iv = entradaIv.value ? entradaIv.valueAsNumber : null;
+      if (entradaIv.validity.badInput || (qualidade === null && iv === null) || (qualidade !== null &&
           (!/^\d(?:[.,]\d{1,2})?$/.test(entradaQualidade) || qualidade <= 0 || qualidade > QUALIDADE_LENDARIA)) ||
           (iv !== null && !inteiro(iv, 6, 193))) {
         return informar("Preencha pelo menos um limite válido para Pokémon. Qualidade até 1,70 ou IV de 6 a 193.");
