@@ -153,11 +153,11 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
         }));
       }
     }
-    return { dados, equipe, elegiveis: elegiveis.length, falhas };
+    return { dados, elegiveis: elegiveis.length, falhas };
   }
 
   function apresentar(resultado, medicao) {
-    const { dados, equipe, elegiveis, falhas } = resultado;
+    const { dados, elegiveis, falhas } = resultado;
     const comparadas = dados.filter(hunt => hunt.combate);
     const comCombate = comparadas.length > 0;
     const referencia = comparadas.find(hunt => nomeCombateHunts(hunt.nome) === nomeCombateHunts(medicao?.hunt ?? ""));
@@ -179,38 +179,31 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
         ? `${hunt.nome} · Lv. ${formatar(hunt.nivel)} · ${casasDecimais.format(hunt[metrica])} ${unidade}/abate${porHora(hunt, metrica, unidade)}`
         : "Estimativa indisponível";
     };
-    exibir("hunt-estimativa-xp", melhor("xp"), "xp", "XP");
-    exibir("hunt-estimativa-drops", melhor("drops"), "drops", "Pokédollars");
+    const melhorXp = melhor("xp");
+    const melhoresDrops = melhor("drops");
+    exibir("hunt-estimativa-xp", melhorXp, "xp", "XP");
+    exibir("hunt-estimativa-drops", melhoresDrops, "drops", "Pokédollars");
     const metodo = comCombate
       ? `${comparadas.length} com comparação de combate${Number.isFinite(fatorHora) ? " e ritmo calibrado" : " e ritmo relativo"}`
       : "classificação por abate enquanto faltam dados de combate";
     campo("hunt-estimativa-status").textContent = elegiveis
       ? `${dados.length} de ${elegiveis} hunts elegíveis por nível comparadas · ${metodo}${falhas ? ` · ${falhas} fichas indisponíveis` : ""}.`
       : "Nenhuma hunt regular elegível para este nível e esta equipe.";
-    const nomesGolpes = golpes => golpes.map(golpe => `${golpe.nome} (${golpe.rotuloTipo})`).join(", ");
-    campo("hunt-golpes-equipe").textContent = equipe
-      ? equipe.map(membro => `${membro.nome} (${membro.rotuloTipos}) · ${nomesGolpes(membro.golpes) || "sem golpes ativos"}`).join("\n")
-      : "Aguardando a leitura da barra de habilidades e dos golpes de dano direto da equipe.";
-    const valorBase = (valor, unidade) => Number.isFinite(valor)
-      ? `${casasDecimais.format(valor)} ${unidade}/abate` : `${unidade} indisponível`;
     const custos = comparadas.map(hunt => hunt.combate.custo).filter(Number.isFinite);
     const maisRapida = Math.min(...custos);
     const comparacao = dados.map(hunt => {
-      const resumo = `${hunt.nome} (Lv. ${formatar(hunt.nivel)}) · ${valorBase(hunt.xp, "XP")} · ${valorBase(hunt.drops, "$")}`;
-      if (!hunt.combate) return `${resumo}\nCombate indisponível.`;
-      const custo = hunt.combate.custo;
-      const ritmo = Number.isFinite(custo)
-        ? Number.isFinite(fatorHora)
-          ? `~${formatar(Math.round(fatorHora / custo))} abates/h${porHora(hunt, "xp", "XP")}${porHora(hunt, "drops", "$")}`
-          : `ritmo relativo ${formatar(Math.round(100 * maisRapida / custo))}% da mais rápida`
-        : "Sem golpe de poder fixo eficaz contra pelo menos uma espécie";
-      const detalhes = hunt.combate.encontros.map(({ nome, rotuloTipos, nivel, peso, golpes, melhor, ameaca }) => {
-        const descricao = golpe => `${golpe.nome} → ${golpe.pokemon} ×${casasDecimais.format(golpe.fator)}`;
-        const ataque = melhor ? `; time: ${melhor.pokemon} usa ${melhor.nome} ×${casasDecimais.format(melhor.fator)}` : "";
-        const risco = ameaca ? `; ameaça: ${descricao(ameaca)}` : "";
-        return `${nome} (${rotuloTipos}, Lv. ~${formatar(nivel)}, ${casasDecimais.format(peso)}%) · ${nomesGolpes(golpes) || "sem golpes desbloqueados"}${ataque}${risco}`;
-      });
-      return [`${resumo} · ${ritmo}`, ...detalhes].join("\n");
+      const titulo = `${hunt.nome} (Lv. ${formatar(hunt.nivel)})`;
+      if (!hunt.combate) return `${titulo}\nDados de combate indisponíveis para esta comparação.`;
+      const { custo, pressaoAlta } = hunt.combate;
+      if (!Number.isFinite(custo)) return `${titulo}\nCobertura insuficiente contra parte dos encontros.`;
+
+      const ritmo = custo === maisRapida ? "Ritmo mais rápido para o time"
+        : `${formatar(Math.round(100 * maisRapida / custo))}% do melhor ritmo do time`;
+      const destaques = [ritmo];
+      if (hunt === melhorXp) destaques.push("melhor para XP");
+      if (hunt === melhoresDrops) destaques.push("melhor para drops");
+      if (pressaoAlta) destaques.push("dano recebido pode atrasar abates");
+      return `${titulo}\n${destaques.join(" · ")}.`;
     }).join("\n\n") || "Aguardando hunts para comparar.";
     const lista = campo("hunt-comparacao");
     if (lista.textContent !== comparacao) lista.textContent = comparacao;
@@ -225,7 +218,6 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       campo("hunt-estimativa-xp").textContent = "Aguardando níveis";
       campo("hunt-estimativa-drops").textContent = "Aguardando níveis";
       campo("hunt-estimativa-status").textContent = "Aguardando o nível do treinador e dos Pokémon ativos.";
-      campo("hunt-golpes-equipe").textContent = "";
       campo("hunt-comparacao").textContent = "";
       return;
     }
@@ -241,7 +233,6 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     campo("hunt-estimativa-xp").textContent = "Consultando...";
     campo("hunt-estimativa-drops").textContent = "Consultando...";
     campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
-    campo("hunt-golpes-equipe").textContent = "";
     campo("hunt-comparacao").textContent = "Consultando as fichas de combate...";
     void classificar(nivel, niveisEquipe, vip, equipe.membros, golpesAtivos).then(resultado => {
       if (consulta !== atual) return;

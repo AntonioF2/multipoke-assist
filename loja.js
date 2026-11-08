@@ -131,7 +131,7 @@
       #aba-hunts h3 { margin: 10px 0 4px; font-size: 14px; }
       .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
-      #hunt-historico, #hunt-golpes-equipe, #hunt-comparacao { white-space: pre-line; }
+      #hunt-historico, #hunt-comparacao { white-space: pre-line; }
       #hunt-comparacao { max-height: 250px; overflow: auto; }
       #hunt-medicao, #aba-hunts small { color: #445b7d; }
       .regras { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
@@ -227,8 +227,6 @@
         <p><small id="hunt-estimativa-status"></small></p>
         <details class="regras">
           <summary>Comparar hunts e golpes</summary>
-          <p><strong>Golpes ativos da equipe</strong></p>
-          <p id="hunt-golpes-equipe"></p>
           <p id="hunt-comparacao" tabindex="0"></p>
         </details>
         <p><small>Ritmo estimado com tipos e golpes de poder fixo. Atributos de referência e encontros da Pokepédia. XP base da PokéAPI.</small></p>

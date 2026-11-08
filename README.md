@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.16**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.17**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -79,7 +79,7 @@ Abra **Análise de hunts** para ver estimativas antes de testar uma hunt. A exte
 
 Para XP, a análise pondera a XP base de referência de cada espécie pela sua participação nos encontros e aplica os multiplicadores da hunt. Para drops, usa o valor esperado dos itens comuns vendidos ao NPC que a Pokepédia publica por abate. [Catálogo de hunts](https://multipoke.io/pokepedia/hunts) · [XP base de referência](https://pokeapi.co/docs/v2#pokemon)
 
-Em **Comparar hunts e golpes**, a extensão lista os golpes equipados na barra de habilidades e estima até quatro golpes dos selvagens pelo nível típico da faixa de encontro. A comparação usa tipos, STAB, fraquezas, resistências, imunidades, poder, precisão e recarga. O modelo combina o tempo estimado para abater cada espécie com o risco do dano recebido e pondera pela frequência dos encontros. Usa atributos de referência e golpes de poder fixo. Críticos, efeitos, dano variável, área, genes e bônus individuais podem mudar o resultado no jogo. [Guia de combate](https://multipoke.io/pokepedia/guias/combate)
+Em **Comparar hunts e golpes**, cada hunt tem um resumo do ritmo para a equipe atual, dos destaques de XP e drops e de limitações de combate relevantes. O modelo usa os golpes equipados e estima até quatro golpes dos selvagens pelo nível típico da faixa de encontro. Compara tipos, STAB, fraquezas, resistências, imunidades, poder, precisão e recarga. Usa atributos de referência e golpes de poder fixo. Críticos, efeitos, dano variável, área, genes e bônus individuais podem mudar o resultado no jogo. [Guia de combate](https://multipoke.io/pokepedia/guias/combate)
 
 A classificação combina recompensa por abate e ritmo estimado. Quando existe uma medição da hunt atual com os mesmos golpes equipados e ela está entre as candidatas analisadas, a extensão calibra os ganhos por hora a partir dos abates observados. Sem essa referência, mostra o ritmo relativo entre as hunts. Se os dados de combate estiverem indisponíveis, usa a recompensa por abate.
 
@@ -145,6 +145,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.17 | Resumo curto por hunt com o ritmo e os destaques para a equipe atual. |
 | `CWS_PUBLISHER_ID` | ID do editor exibido no Painel do desenvolvedor |
 | `CWS_EXTENSION_ID` | ID do item criado na Chrome Web Store |
 | `CWS_SERVICE_ACCOUNT` | E-mail da conta de serviço mostrado no Cloud Shell |

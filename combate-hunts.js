@@ -90,9 +90,7 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     return comCache(especies, id, async () => {
       const ficha = await pagina(`/pokepedia/pokemon/${id}`);
       const nome = texto(ficha, "h1");
-      const distintivos = [...ficha.querySelectorAll(".entry-meta .type-badge[data-type]")];
-      const tipos = distintivos.map(no => no.dataset.type);
-      const rotuloTipos = distintivos.map(no => no.textContent.trim()).join("/");
+      const tipos = [...ficha.querySelectorAll(".entry-meta .type-badge[data-type]")].map(no => no.dataset.type);
       const base = Object.fromEntries(atributos.map(atributo => [
         atributo, numero(ficha.querySelector(`#atributos [data-stat="${atributo}"] meter`)?.getAttribute("value")),
       ]));
@@ -107,7 +105,7 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
       if (!golpes.length || golpes.some(golpe => !Number.isSafeInteger(golpe.nivel) || golpe.nivel < 1)) {
         throw new Error("Repertório de golpes indisponível.");
       }
-      return { nome, tipos, rotuloTipos, base, golpes };
+      return { tipos, base, golpes };
     });
   }
 
@@ -157,10 +155,10 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
           opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria) ??
           (poder > 0 ? await carregarGolpeExtra(golpe) : null);
         if (!ficha && poder > 0) return null;
-        return { ...ficha, nome: golpe.nome, rotuloTipo: golpe.tipo, poder };
+        return { ...ficha, poder };
       }));
       if (golpes.some(golpe => !golpe)) return null;
-      return { ...especie, nome: membro.nome, stats: statsNoNivel(especie, niveis[i]), golpes };
+      return { tipos: especie.tipos, stats: statsNoNivel(especie, niveis[i]), golpes };
     }));
     return equipe.every(Boolean) && equipe.some(membro => membro.golpes.some(golpe => golpe.poder > 0)) ? equipe : null;
   }
@@ -183,7 +181,7 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
         Math.round(golpe.poder / 256 * ataque ** 2 / (ataque + defesa) * fator * pressao)) * golpe.precisao;
       const speed = atacante.stats.speed;
       const recarga = Math.max(1, golpe.recarga * (1 - 0.15 * speed / (speed + 200)));
-      return { nome: golpe.nome, fator, dano, frequencia: 1 / recarga };
+      return { dano, frequencia: 1 / recarga };
     }).sort((a, b) => b.dano - a.dano);
     let acoes = 1;
     let dps = 0;
@@ -192,7 +190,7 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
       dps += golpe.dano * frequencia;
       acoes -= frequencia;
     }
-    return { dps, melhor: valores.find(golpe => golpe.dano > 0) };
+    return dps;
   }
 
   function compararEncontro(especie, encontro, equipe, hunt) {
@@ -203,24 +201,15 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     const selvagem = { ...especie, stats: statsNoNivel(especie, nivel), golpes };
     let dps = 0;
     let risco = 0;
-    let melhor;
-    let ameaca;
     for (const membro of equipe) {
-      const ofensiva = ataques(membro, selvagem);
-      const defensiva = ataques(selvagem, membro, hunt.pressao);
-      dps += ofensiva.dps;
-      risco += defensiva.dps / membro.stats.hp / equipe.length;
-      if (ofensiva.melhor && (!melhor || ofensiva.melhor.dano > melhor.dano)) {
-        melhor = { ...ofensiva.melhor, pokemon: membro.nome };
-      }
-      if (defensiva.melhor && (!ameaca || defensiva.melhor.dano > ameaca.dano)) {
-        ameaca = { ...defensiva.melhor, pokemon: membro.nome };
-      }
+      dps += ataques(membro, selvagem);
+      risco += ataques(selvagem, membro, hunt.pressao) / membro.stats.hp / equipe.length;
     }
     const tempo = Math.max(1, selvagem.stats.hp / dps);
     // Aproxima o deslocamento e penaliza a exposição ao dano recebido durante o combate.
-    const custo = dps > 0 ? (hunt.ritmo + tempo) * (1 + Math.min(1, tempo * risco)) : Infinity;
-    return { nome: especie.nome, rotuloTipos: especie.rotuloTipos, nivel, peso: encontro.peso, golpes, melhor, ameaca, custo };
+    const custoBase = hunt.ritmo + tempo;
+    const custo = dps > 0 ? custoBase * (1 + Math.min(1, tempo * risco)) : Infinity;
+    return { peso: encontro.peso, custo, custoBase };
   }
 
   async function comparar(hunt, equipe) {
@@ -233,7 +222,8 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     if (encontros.some(encontro => !encontro)) return null;
     const peso = encontros.reduce((soma, encontro) => soma + encontro.peso, 0);
     const custo = encontros.reduce((soma, encontro) => soma + encontro.peso * encontro.custo, 0) / peso;
-    return { encontros, custo };
+    const custoBase = encontros.reduce((soma, encontro) => soma + encontro.peso * encontro.custoBase, 0) / peso;
+    return { custo, pressaoAlta: Number.isFinite(custo) && custo >= 1.25 * custoBase };
   }
 
   return { carregarEquipe, comparar, limparCache };
