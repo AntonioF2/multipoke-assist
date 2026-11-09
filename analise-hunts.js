@@ -218,7 +218,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     const pontuar = (hunt, metrica) => comCombate ? pontuacaoCombateHunt(hunt, metrica) : hunt[metrica];
     const melhor = metrica => candidatas.reduce((lider, hunt) => {
       const pontos = pontuar(hunt, metrica);
-      return Number.isFinite(pontos) && (!comCombate || Number.isFinite(hunt.combate.custo)) &&
+      return Number.isFinite(pontos) &&
         (!lider || pontos > pontuar(lider, metrica)) ? hunt : lider;
     }, null);
     const porHora = (hunt, metrica, unidade) => {
@@ -280,8 +280,10 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
 
     const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, golpesAtivos, vip, pessoal, live, global, beta, tipoDia, fatorDia]);
     if (consulta?.chave === chave && Date.now() < consulta.expira) {
-      consulta.medicao = medicao;
-      if (consulta.resultado) apresentar(consulta.resultado, medicao);
+      if (consulta.medicao?.area !== medicao?.area || consulta.medicao?.abatesHora !== medicao?.abatesHora) {
+        consulta.medicao = medicao;
+        if (consulta.resultado) apresentar(consulta.resultado, medicao);
+      }
       return;
     }
     const atual = { chave, medicao, expira: Date.now() + TTL };
@@ -483,18 +485,18 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
   document.addEventListener("visibilitychange", reiniciarJanela);
 
   async function atualizar() {
-    const cacada = lerCacada();
+    const mostraAnalise = visivel();
     const trocaAtiva = trocaHunts.ativa();
+    if (!mostraAnalise && !trocaAtiva) return reiniciarJanela();
+    const cacada = lerCacada();
     if (trocaAtiva) void trocaHunts.atualizar(cacada, () => lerCacada()?.slug === cacada?.slug);
     const equipe = equipeAtual();
     acompanhar(equipe, cacada);
-    const mostraAnalise = visivel();
-    if (!mostraAnalise && !trocaAtiva) return reiniciarJanela();
     const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
     const bonus = lerBonusHunts();
     const contextoAtual = contextoMedicao(equipe, golpesAtivos, bonus);
-    const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
     if (mostraAnalise) {
+      const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
       apresentar(equipe, cacada, historicoAtual);
       const referencia = historicoAtual?.rendimentos.find(item => item.area === cacada?.slug);
       recomendar(equipe, golpesAtivos, referencia, bonus);
@@ -523,7 +525,10 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
   }
 
   setInterval(() => void atualizar(), 5000);
-  const observar = new MutationObserver(() => acompanhar(equipeAtual(), lerCacada()));
+  const observar = new MutationObserver(() => {
+    if (!visivel() && !trocaHunts.ativa()) return reiniciarJanela();
+    acompanhar(equipeAtual(), lerCacada());
+  });
   for (const id of ["party-members", "hunt-header", "hunt-clock"]) {
     const no = document.getElementById(id);
     if (no) observar.observe(no, { childList: true, subtree: true, characterData: true, attributeFilter: ["aria-label", "data-team-pokemon"] });

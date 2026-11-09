@@ -109,21 +109,21 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
     }));
   }
 
-  async function carregarGolpeExtra(golpe) {
+  async function carregarGolpeExtra(golpe, nome, poder) {
     indiceGolpes ??= cacheDadosHunts("indice-golpes", async () => {
       const paginaGolpes = await pagina("/pokepedia/golpes");
       return [...paginaGolpes.querySelectorAll("a.entry-main[href^='/pokepedia/golpes/']")].map(link => [
         nomeCombateHunts(texto(link, "h2")), link.getAttribute("href"),
       ]);
     }, linhas => linhas.length > 0).then(linhas => new Map(linhas)).catch(() => { indiceGolpes = undefined; return null; });
-    const url = (await indiceGolpes)?.get(nomeCombateHunts(golpe.nome));
+    const url = (await indiceGolpes)?.get(nome);
     if (!/^\/pokepedia\/golpes\/[\w-]+$/.test(url)) return null;
     const opcoes = await comCache(golpesExtras, url, () => cacheDadosHunts(`golpe/${url.split("/").at(-1)}`, async () => {
       const ficha = await pagina(url);
       return [...ficha.querySelectorAll("tbody tr")].map(linha => lerGolpe(linha, golpe.nome));
     }, linhas => linhas.length > 0));
     return opcoes?.find(opcao => opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria &&
-      opcao.poder === numero(golpe.poder.match(/^Poder ([\d.]+)$/)?.[1])) ??
+      opcao.poder === poder) ??
       opcoes?.find(opcao => opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria);
   }
 
@@ -166,9 +166,10 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
       if (!especie) return null;
       const golpes = await Promise.all(golpesAtivos[i].map(async golpe => {
         const poder = numero(golpe.poder.match(/^Poder ([\d.]+)$/)?.[1]);
-        const ficha = especie.golpes.find(opcao => nomeCombateHunts(opcao.nome) === nomeCombateHunts(golpe.nome) &&
+        const nomeGolpe = nomeCombateHunts(golpe.nome);
+        const ficha = especie.golpes.find(opcao => nomeCombateHunts(opcao.nome) === nomeGolpe &&
           opcao.rotuloTipo === golpe.tipo && opcao.categoria === golpe.categoria) ??
-          (poder > 0 ? await carregarGolpeExtra(golpe) : null);
+          (poder > 0 ? await carregarGolpeExtra(golpe, nomeGolpe, poder) : null);
         if (!ficha && poder > 0) return null;
         return { ...ficha, poder };
       }));
@@ -187,17 +188,21 @@ function criarModeloCombateHunts(pagina, { texto, decimal, numero }) {
   }
 
   function ataques(atacante, defensor, pressao = 1) {
-    const valores = atacante.golpes.filter(golpe => golpe.poder > 0).map(golpe => {
+    const valores = [];
+    const speed = atacante.stats.speed;
+    const fatorRecarga = 1 - 0.15 * speed / (speed + 200);
+    for (const golpe of atacante.golpes) {
+      if (!(golpe.poder > 0)) continue;
       const fator = modificador(golpe.tipo, atacante, defensor);
       const fisico = golpe.categoria === "Físico";
       const ataque = atacante.stats[fisico ? "atk" : "spAtk"];
       const defesa = defensor.stats[fisico ? "def" : "spDef"];
       const dano = fator === 0 ? 0 : Math.max(1,
         Math.round(golpe.poder / 256 * ataque ** 2 / (ataque + defesa) * fator * pressao)) * golpe.precisao;
-      const speed = atacante.stats.speed;
-      const recarga = Math.max(1, golpe.recarga * (1 - 0.15 * speed / (speed + 200)));
-      return { dano, frequencia: 1 / recarga };
-    }).sort((a, b) => b.dano - a.dano);
+      const recarga = Math.max(1, golpe.recarga * fatorRecarga);
+      valores.push({ dano, frequencia: 1 / recarga });
+    }
+    valores.sort((a, b) => b.dano - a.dano);
     let acoes = 1;
     let dps = 0;
     for (const golpe of valores) {

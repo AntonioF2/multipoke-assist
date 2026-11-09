@@ -14,14 +14,16 @@
   }
 
   const seletor = "#manual-capture button[data-capture-corpse], #economy-hunt button[data-economy-capture]";
-  const tentados = new Set();
+  let tentados = new Set();
   const INTERVALO_SELECAO = 2_000;
   let capturaAtiva = false;
   let selecaoPendente;
 
   function clicarSeDisponivel() {
+    const treinadorDaCompra = raiz.dataset.multipokeTreinadorReposicaoAtiva;
+    if (!capturaAtiva && !treinadorDaCompra) return;
     const treinador = document.querySelector("#party-trainer-name")?.textContent.trim();
-    const compraAtiva = treinador && raiz.dataset.multipokeTreinadorReposicaoAtiva === treinador
+    const compraAtiva = treinador && treinadorDaCompra === treinador
       ? raiz.dataset.multipokeBolaReposicaoAtiva : "";
     if (!capturaAtiva && !compraAtiva) return;
     const bola = (compraAtiva || escolhaBolaReposicao(treinador))?.match(/^ball:(\d+)$/)?.[1];
@@ -29,17 +31,22 @@
     if (!capturaAtiva) return;
     if (raiz.dataset.multipokeAutocaptura !== estado) raiz.dataset.multipokeAutocaptura = estado;
     if (estado !== "ativa") return;
-    const botoes = Array.from(document.querySelectorAll(seletor), botao => ({
-      botao,
-      alvo: botao.dataset.captureCorpse ?? botao.dataset.economyCapture,
-    }));
-    const presentes = new Set(botoes.map(({ alvo }) => alvo));
-    for (const alvo of tentados) {
-      if (!presentes.has(alvo)) tentados.delete(alvo);
+    const botoes = document.querySelectorAll(seletor);
+    if (!botoes.length) {
+      tentados.clear();
+      return;
     }
 
-    for (const { botao, alvo } of botoes) {
-      if (!alvo || tentados.has(alvo) || botao.matches(":disabled, [aria-disabled='true']")) continue;
+    const presentes = new Set();
+    let proximo;
+    for (const botao of botoes) {
+      const alvo = botao.dataset.captureCorpse ?? botao.dataset.economyCapture;
+      if (!alvo) continue;
+      if (tentados.has(alvo)) {
+        presentes.add(alvo);
+        continue;
+      }
+      if (proximo || botao.matches(":disabled, [aria-disabled='true']")) continue;
       if (botao.textContent.trim() !== "Capturar" ||
           botao.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false) continue;
 
@@ -47,10 +54,11 @@
       const visivel = document.elementFromPoint(area.left + area.width / 2, area.top + area.height / 2);
       if (!botao.contains(visivel)) continue;
 
-      tentados.add(alvo);
-      botao.click();
-      return;
+      presentes.add(alvo);
+      proximo = botao;
     }
+    tentados = presentes;
+    proximo?.click();
   }
 
   function escolhaBolaReposicao(treinador) {
