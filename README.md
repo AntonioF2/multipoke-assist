@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.22**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão desta extensão é a **1.5.23**.
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -34,7 +34,7 @@ Para ativar a captura manualmente, use o botão roxo no painel. No Windows, voc�
 
 A extensão procura o botão **Capturar** nos painéis normal e de economia e aciona o clique quando o botão está visível e habilitado. O próprio jogo processa a tentativa com a Poké Bola selecionada nele.
 
-Se você selecionar uma Poké Bola para reposição, a Autocaptura acompanha o estoque dessa bola mesmo com a Auto Loja pausada ou com o painel recolhido. Ela aguarda quando o estoque chega a zero e retoma assim que a mochila volta a ter pelo menos uma unidade. Para capturar sem esse controle de estoque, escolha **Sem reposição** no campo **Poké Bola**.
+Se você selecionar uma Poké Bola para reposição, a extensão mantém essa bola equipada no Auto Helper enquanto a Autocaptura ou a reposição estiver ativa. A Autocaptura espera a reposição do estoque e a confirmação da bola equipada antes de retomar. Para usar a seleção do jogo livremente, escolha **Sem reposição** no campo **Poké Bola**.
 
 Use o botão roxo **Autocaptura ligada** no painel Auto Loja para desligar só a captura. Clique em **Autocaptura desligada** para ligar de novo. Esse botão funciona independentemente das compras e vendas. O comando `multiPokeCaptura.parar()` no console também pode desligá-la. Ao recarregar a página, a Autocaptura volta a iniciar.
 
@@ -91,9 +91,7 @@ O IndexedDB da extensão mantém as **10 janelas mais recentes** e os recordes d
 
 ## Troca de hunt
 
-Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. Quando as duas hunts comparadas têm medições para a configuração atual, divide o ganho registrado pelo jogo pelo tempo observado. Para pares sem medições comparáveis, usa o rendimento estimado com os bônus ativos de XP ou o valor de itens comuns vendidos ao NPC, conforme a prioridade escolhida.
-
-Com a prioridade **Nível da hunt**, a extensão escolhe a área de maior nível acima da atual entre as que o treinador pode acessar e que o time consegue enfrentar segundo o modelo de combate. A análise usa os níveis, tipos e golpes da equipe e descarta áreas com cobertura insuficiente ou pressão alta de dano estimada. Em empate de nível, prefere o menor custo de combate estimado. A porcentagem de melhoria se aplica às prioridades de XP e drops.
+Na aba **Troca de hunt**, clique em **Iniciar troca automática**. Entre as hunts regulares disponíveis no menu **Caçada**, a extensão prefere a favorita de maior nível. Se nenhuma disponível for favorita, escolhe a de maior nível. A hunt atual tem preferência em caso de empate no nível e no status de favorito.
 
 A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro minuto da caçada, exige que a aba do jogo esteja em foco e respeita um intervalo de **5 minutos** entre tentativas de entrada. Pode continuar com o painel recolhido. A ativação dura até pausar, trocar de treinador ou recarregar a aba.
 
@@ -171,6 +169,7 @@ Execute **Run workflow** na `main` para validar o acesso. Aumente `version` no `
 
 | Versão | O que mudou |
 | --- | --- |
+| 1.5.23 | Troca de hunt por favoritos e nível do menu Caçada e seleção automática da bola configurada para reposição. |
 | 1.5.16 | Análise de hunts com tipos, golpes ativos da equipe e repertório estimado dos selvagens. |
 | 1.5.15 | Um clique no ícone da barra do Chrome alterna a visibilidade do painel Auto Loja. |
 | 1.5.14 | Menu no ícone da extensão para mostrar ou ocultar o painel Auto Loja. |
