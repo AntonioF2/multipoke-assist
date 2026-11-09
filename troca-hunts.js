@@ -23,18 +23,30 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
     }, { capture: true, passive: true });
   }
 
+  function atualizarMinimo() {
+    const porNivel = objetivo.value === "nivel";
+    campo("troca-limite").hidden = porNivel;
+    minimo.disabled = porNivel || Boolean(sessao);
+  }
+
+  objetivo.addEventListener("change", atualizarMinimo);
+  atualizarMinimo();
+
   function definirSessao(atual) {
     sessao = atual;
     botao.textContent = sessao ? "Pausar troca automática" : "Iniciar troca automática";
-    objetivo.disabled = minimo.disabled = Boolean(sessao);
+    objetivo.disabled = Boolean(sessao);
+    atualizarMinimo();
   }
 
   botao.addEventListener("click", () => {
     if (sessao) {
       definirSessao(null);
       informar("Troca automática pausada.");
-    } else if (!minimo.validity.valid || !["xp", "drops"].includes(objetivo.value)) {
-      informar("Escolha XP ou drops e informe uma melhoria de 1% a 100%.");
+    } else if (!["xp", "drops", "nivel"].includes(objetivo.value)) {
+      informar("Escolha uma prioridade para a troca.");
+    } else if (objetivo.value !== "nivel" && !minimo.validity.valid) {
+      informar("Informe uma melhoria de 1% a 100%.");
     } else {
       const nome = treinador();
       if (!nome) return informar("Selecione um treinador antes de iniciar a troca automática.");
@@ -121,6 +133,33 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
     }
   }
 
+  function escolherPorNivel(candidatas, huntAtual) {
+    const [hunt] = candidatas.filter(hunt => hunt.nivel > huntAtual.nivel &&
+      Number.isFinite(hunt.combate?.custo) && !hunt.combate.pressaoAlta)
+      .sort((a, b) => b.nivel - a.nivel || a.combate.custo - b.combate.custo);
+    return hunt && { hunt, detalhe: ` (Lv. ${formatar(huntAtual.nivel)} → Lv. ${formatar(hunt.nivel)})` };
+  }
+
+  function escolherPorRendimento(candidatas, huntAtual, { metrica, minimo }, rendimentos) {
+    const medidos = new Map(rendimentos.map(item => [item.area, item[metrica]]));
+    const baseMedida = medidos.get(huntAtual.slug);
+    const baseEstimada = pontuacaoCombateHunt(huntAtual, metrica);
+    const [alvo] = candidatas.map(hunt => {
+      const pontosMedidos = medidos.get(hunt.slug);
+      const medida = Number.isFinite(baseMedida) && Number.isFinite(pontosMedidos);
+      const base = medida ? baseMedida : baseEstimada;
+      const pontos = medida ? pontosMedidos : pontuacaoCombateHunt(hunt, metrica);
+      return { hunt, pontos, medida, ganho: pontos > base ? (base === 0 ? Infinity : pontos / base - 1) : 0 };
+    }).filter(({ ganho }) => ganho >= minimo / 100 - Number.EPSILON)
+      .sort((a, b) => b.ganho - a.ganho || Number(b.medida) - Number(a.medida) || b.pontos - a.pontos);
+    if (!alvo) return;
+    const { hunt, medida, ganho } = alvo;
+    const origem = medida ? "medição recente" : "estimativa";
+    const detalhe = Number.isFinite(ganho) ? ` (+${formatar(Math.round(ganho * 100))}% por ${origem})`
+      : ` (ganho acima de zero por ${origem})`;
+    return { hunt, detalhe };
+  }
+
   async function atualizar(dados, cacada, treinador, confirmarContexto, rendimentos = []) {
     if (pendente) {
       if (cacada?.slug === pendente.slug) {
@@ -147,30 +186,16 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
       bloqueadas.clear();
     }
 
-    const metrica = atual.metrica;
+    const porNivel = atual.metrica === "nivel";
     const huntAtual = dados.find(hunt => hunt.slug === cacada.slug);
     if (!huntAtual) return informar("Aguardando dados da hunt atual.");
-    const medidos = new Map(rendimentos.map(item => [item.area, item[metrica]]));
-    const baseMedida = medidos.get(huntAtual.slug);
-    const baseEstimada = pontuacaoCombateHunt(huntAtual, metrica);
-    const candidatas = dados.filter(hunt => hunt !== huntAtual && !bloqueadas.has(hunt.slug))
-      .map(hunt => {
-        const pontosMedidos = medidos.get(hunt.slug);
-        const medida = Number.isFinite(baseMedida) && Number.isFinite(pontosMedidos);
-        const base = medida ? baseMedida : baseEstimada;
-        const pontos = medida ? pontosMedidos : pontuacaoCombateHunt(hunt, metrica);
-        return { hunt, pontos, medida, ganho: pontos > base ? (base === 0 ? Infinity : pontos / base - 1) : 0 };
-      })
-      .filter(({ ganho }) => ganho >= atual.minimo / 100 - Number.EPSILON)
-      .sort((a, b) => b.ganho - a.ganho || Number(b.medida) - Number(a.medida) || b.pontos - a.pontos);
-    const alvo = candidatas[0];
-    if (!alvo) return informar(`Nenhuma hunt disponível entre as comparadas alcançou a melhoria mínima de ${formatar(atual.minimo)}%.`);
-    const { hunt, medida } = alvo;
-    const origem = medida ? "medição recente" : "estimativa";
-    const ganho = Number.isFinite(alvo.ganho)
-      ? ` (+${formatar(Math.round(alvo.ganho * 100))}% por ${origem})`
-      : ` (ganho acima de zero por ${origem})`;
-    if (!livre()) return informar(`${hunt.nome}${ganho}. Aguardando o jogo livre e em foco.`);
+    const candidatas = dados.filter(hunt => hunt !== huntAtual && !bloqueadas.has(hunt.slug));
+    const alvo = porNivel ? escolherPorNivel(candidatas, huntAtual)
+      : escolherPorRendimento(candidatas, huntAtual, atual, rendimentos);
+    if (!alvo) return informar(porNivel ? "Aguardando uma hunt de nível mais alto adequada ao time atual."
+      : `Nenhuma hunt disponível entre as comparadas alcançou a melhoria mínima de ${formatar(atual.minimo)}%.`);
+    const { hunt, detalhe } = alvo;
+    if (!livre()) return informar(`${hunt.nome}${detalhe}. Aguardando o jogo livre e em foco.`);
 
     ocupada = true;
     try {
@@ -183,7 +208,7 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
         }
         proximaTroca = Date.now() + INTERVALO_TROCA;
         pendente = { slug: hunt.slug, nome: hunt.nome, vence: Date.now() + PRAZO_CONFIRMACAO };
-        informar(`Entrada solicitada em ${hunt.nome}${ganho}. Aguardando confirmação do jogo.`);
+        informar(`Entrada solicitada em ${hunt.nome}${detalhe}. Aguardando confirmação do jogo.`);
       });
     } catch {
       proximaTroca = Date.now() + INTERVALO_TROCA;
@@ -193,5 +218,10 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
     }
   }
 
-  return { ativa: () => Boolean(sessao || pendente), emTroca: () => Boolean(ocupada || pendente), atualizar };
+  return {
+    ativa: () => Boolean(sessao || pendente),
+    porNivel: () => sessao?.metrica === "nivel",
+    emTroca: () => Boolean(ocupada || pendente),
+    atualizar,
+  };
 }

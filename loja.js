@@ -134,6 +134,7 @@
       #abas button[aria-pressed="true"] { background: var(--azul); color: #fff; }
       #aba-hunts, #aba-troca { padding: 0 12px 12px; }
       #aba-troca label { display: block; margin: 7px 0; }
+      #troca-limite[hidden] { display: none; }
       #troca-minimo { width: 64px; }
       #aba-hunts h3 { margin: 10px 0 4px; font-size: 14px; }
       .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
@@ -254,12 +255,13 @@
         <p><small>As medições usam janelas de pelo menos 5 minutos com a análise aberta ou a troca automática ativa. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
-        <p>Troque de hunt quando outra área disponível render mais para a equipe atual.</p>
+        <p>Troque de hunt conforme a prioridade escolhida e a equipe atual.</p>
         <label>Prioridade <select id="troca-objetivo">
           <option value="xp">XP</option>
           <option value="drops">Valor dos drops</option>
+          <option value="nivel">Nível da hunt</option>
         </select></label>
-        <label>Melhoria mínima <input id="troca-minimo" type="number" min="1" max="100" step="1" value="10" required> %</label>
+        <label id="troca-limite">Melhoria mínima <input id="troca-minimo" type="number" min="1" max="100" step="1" value="10" required> %</label>
         <button id="troca-alternar" type="button">Iniciar troca automática</button>
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>

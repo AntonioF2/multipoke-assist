@@ -2,7 +2,7 @@
 
 Extensão local para o Google Chrome que clica em **Capturar** no MultiPoke Idle e adiciona o painel **Auto Loja** para repor suprimentos, vender loot e vender Pokémon por qualidade e IV total.
 
-A versão atual é a **1.5.21**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
+A versão atual é a **1.5.22**, disponível na branch principal [`main`](https://github.com/AntonioF2/multipoke-autocaptura/tree/main).
 
 ## Instalação no Chrome em modo de desenvolvimento
 
@@ -93,6 +93,8 @@ O IndexedDB da extensão mantém as **10 janelas mais recentes** e os recordes d
 
 Na aba **Troca de hunt**, escolha **XP** ou **Valor dos drops**, informe a melhoria mínima desejada (padrão **10%**) e clique em **Iniciar troca automática**. Durante uma hunt regular, a extensão compara a hunt atual com até 12 hunts próximas do nível da equipe e com as do maior nível elegível. Quando as duas hunts comparadas têm medições para a configuração atual, divide o ganho registrado pelo jogo pelo tempo observado. Para pares sem medições comparáveis, usa o rendimento estimado com os bônus ativos de XP ou o valor de itens comuns vendidos ao NPC, conforme a prioridade escolhida.
 
+Com a prioridade **Nível da hunt**, a extensão escolhe a área de maior nível acima da atual entre as que o treinador pode acessar e que o time consegue enfrentar segundo o modelo de combate. A análise usa os níveis, tipos e golpes da equipe e descarta áreas com cobertura insuficiente ou pressão alta de dano estimada. Em empate de nível, prefere o menor custo de combate estimado. A porcentagem de melhoria se aplica às prioridades de XP e drops.
+
 A troca usa a entrada disponível no menu **Caçar**. Ela aguarda o primeiro minuto da caçada, exige que a aba do jogo esteja em foco e respeita um intervalo de **5 minutos** entre tentativas de entrada. Pode continuar com o painel recolhido. A ativação dura até pausar, trocar de treinador ou recarregar a aba.
 
 ## Quando o Auto Loja funciona
@@ -152,6 +154,7 @@ Vincule o e-mail da conta de serviço em **Conta** no Painel do desenvolvedor da
 
 | Variável | Valor |
 | --- | --- |
+| 1.5.22 | A troca automática ganhou a prioridade **Nível da hunt**, que escolhe a área de maior nível adequada à equipe. |
 | 1.5.21 | Análise e troca de hunts consideram os bônus ativos no cálculo de XP do treinador. |
 | 1.5.20 | A Auto Loja retoma após recarga ou reconexão e adia apenas as operações afetadas por falhas. |
 | 1.5.19 | Catálogo e histórico no IndexedDB, backup em JSON e troca de hunt com medições comparáveis. |

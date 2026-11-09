@@ -171,7 +171,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     return total / pesoTotal;
   }
 
-  async function classificar(nivel, niveisEquipe, bonus, membros, golpesAtivos, slugAtual) {
+  async function classificar(nivel, niveisEquipe, bonus, membros, golpesAtivos, slugAtual, porNivel) {
     const { hunts, xp } = await carregarCatalogo();
     const { vip, tipoDia, fatorDia } = bonus;
     const nivelEquipe = Math.min(...niveisEquipe);
@@ -182,9 +182,12 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       b.nivel - a.nivel || a.nome.localeCompare(b.nome, "pt-BR"));
     const candidatas = new Set(elegiveis.slice(0, LIMITE_HUNTS));
     if (slugAtual) {
+      const nivelAtual = hunts.find(hunt => hunt.slug === slugAtual)?.nivel;
       const maiorNivel = Math.max(...elegiveis.map(hunt => hunt.nivel));
       for (const hunt of elegiveis) {
-        if (hunt.slug === slugAtual || hunt.nivel === maiorNivel) candidatas.add(hunt);
+        if (hunt.slug === slugAtual || hunt.nivel === maiorNivel || (porNivel && hunt.nivel > nivelAtual)) {
+          candidatas.add(hunt);
+        }
       }
     }
     const selecionadas = [...candidatas];
@@ -268,7 +271,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     if (lista.textContent !== comparacao) lista.textContent = comparacao;
   }
 
-  return function recomendar(equipe, golpesAtivos, medicao, slugAtual, bonus) {
+  return function recomendar(equipe, golpesAtivos, medicao, slugAtual, bonus, porNivel) {
     const nivel = numero(texto(document, "#trainer-level-small").match(/^Lv\. ([\d.]+)$/)?.[1]);
     const niveisEquipe = equipe?.membros.map(membro => numero(membro.nivel.match(/^Lv\. ([\d.]+)$/)?.[1]));
     const { vip, pessoal, live, global, beta, tipoDia, nomeDia, fatorDia } = bonus;
@@ -286,7 +289,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
       return;
     }
 
-    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, golpesAtivos, slugAtual,
+    const chave = JSON.stringify([nivel, equipe.chave, niveisEquipe, golpesAtivos, slugAtual, porNivel,
       vip, pessoal, live, global, beta, tipoDia, fatorDia]);
     if (consulta?.chave === chave && Date.now() < consulta.expira) {
       consulta.medicao = medicao;
@@ -299,7 +302,7 @@ function criarRecomendadorHunts(campo, { texto, numero, formatar }) {
     campo("hunt-estimativa-drops").textContent = "Consultando...";
     campo("hunt-estimativa-status").textContent = `Treinador Lv. ${formatar(nivel)} · Consultando a Pokepédia.`;
     campo("hunt-comparacao").textContent = "Consultando as fichas de combate...";
-    void classificar(nivel, niveisEquipe, bonus, equipe.membros, golpesAtivos, slugAtual).then(resultado => {
+    void classificar(nivel, niveisEquipe, bonus, equipe.membros, golpesAtivos, slugAtual, porNivel).then(resultado => {
       if (consulta !== atual) return;
       atual.resultado = resultado;
       if (resultado.falhas || resultado.dados.some(hunt => !hunt.combate || !Number.isFinite(hunt.xp))) {
@@ -507,11 +510,12 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     const referencia = rendimentos?.find(item => item.area === cacada?.slug);
     if (mostraAnalise) apresentar(equipe, cacada, historicoAtual);
     const slugAtual = trocaAtiva ? cacada?.slug : undefined;
-    const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual, bonus) : undefined;
+    const porNivel = trocaHunts.porNivel();
+    const dados = (mostraAnalise || slugAtual) ? recomendar(equipe, golpesAtivos, referencia, slugAtual, bonus, porNivel) : undefined;
     if (trocaAtiva) {
       const contexto = (time, golpes, medicao) => JSON.stringify([time, golpes, texto(document, "#trainer-level-small"), medicao]);
       const inicial = contexto(equipe, golpesAtivos, contextoAtual);
-      void trocaHunts.atualizar(historicoAtual && dados, cacada, treinador(), () => {
+      void trocaHunts.atualizar(porNivel ? dados : historicoAtual && dados, cacada, treinador(), () => {
         const time = equipeAtual();
         if (lerCacada()?.slug !== slugAtual) return false;
         const golpes = time ? lerGolpesHunts(time.membros) : [];
