@@ -76,11 +76,15 @@
   const chaveSessao = "multipoke.auto-loja.sessao";
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
   const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
+  const revives = new Set(["revive", "max revive"]);
+  const rotulosCompra = { bola: "Poké Bolas", pocao: "poções", revive: "revives" };
+  const tiposCompra = Object.keys(rotulosCompra);
   const normalizar = texto => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
   const numero = texto => /^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(texto ?? "")
     ? Number(texto.replaceAll(".", "")) : NaN;
   const inteiro = (valor, min, max) => Number.isSafeInteger(valor) && valor >= min && valor <= max;
-  const compraValida = regra => typeof regra?.id === "string" && /^(ball|supply):\d+$/.test(regra.id) &&
+  const compraValida = regra => tiposCompra.includes(regra?.tipo) && typeof regra.id === "string" &&
+    (regra.tipo === "bola" ? /^ball:\d+$/ : /^supply:\d+$/).test(regra.id) &&
     inteiro(regra.minimo, 0, 10_000) && inteiro(regra.qtd, 1, 10_000);
   const filtroPokemonValido = ({ qualidade, iv, condicao }) =>
     (condicao === "e" || condicao === "ou") && (qualidade !== null || iv !== null) &&
@@ -205,6 +209,9 @@
         <div><label>Poção <select id="pocao"><option value="">Sem reposição</option></select></label>
           <br><label>Até <input id="pocao-min" type="number" min="0" max="10000" value="5"></label>
           <label>Comprar <input id="pocao-qtd" type="number" min="1" max="10000" value="25"></label></div>
+        <div><label>Revive <select id="revive"><option value="">Sem reposição</option></select></label>
+          <br><label>Até <input id="revive-min" type="number" min="0" max="10000" value="2"></label>
+          <label>Comprar <input id="revive-qtd" type="number" min="1" max="10000" value="5"></label></div>
         <div><label>Reserva de Pokédollars <input id="reserva" type="number" min="0" max="999999999" value="200"></label></div>
         <div><label>Venda automática <select id="modo-venda">
             <option value="">Desligada</option>
@@ -303,8 +310,7 @@
   new MutationObserver(atualizarBotaoCaptura).observe(raiz, { attributeFilter: ["data-multipoke-autocaptura"] });
   atualizarBotaoCaptura();
   const informar = mensagem => escrever(campo("mensagem"), mensagem);
-  const tiposCompra = ["bola", "pocao"];
-  const camposCompra = [...tiposCompra, "bola-min", "bola-qtd", "pocao-min", "pocao-qtd", "reserva"];
+  const camposCompra = [...tiposCompra.flatMap(tipo => [tipo, `${tipo}-min`, `${tipo}-qtd`]), "reserva"];
   const camposPokemon = ["pokemon-qualidade", "pokemon-iv", "pokemon-condicao"];
   const escolhasCompra = new Map();
   const regrasLoot = new Map();
@@ -391,8 +397,10 @@
   function produto(linha) {
     const id = linha.dataset.shopRow;
     const nome = texto(linha, ".shop-row-main strong");
-    const tipo = id.startsWith("ball:") && bolas.has(normalizar(nome)) ? "bola"
-      : id.startsWith("supply:") && pocoes.has(normalizar(nome)) ? "pocao" : null;
+    const chave = normalizar(nome);
+    const tipo = id.startsWith("ball:") && bolas.has(chave) ? "bola"
+      : id.startsWith("supply:") && pocoes.has(chave) ? "pocao"
+      : id.startsWith("supply:") && revives.has(chave) ? "revive" : null;
     const estoque = numero(texto(linha, "[data-shop-owned]").match(/^([\d.]+) na mochila$/)?.[1]);
     const preco = numero(texto(linha, "[data-shop-price]").match(/^\$\s*([\d.]+)$/)?.[1]);
     return tipo && inteiro(estoque, 0, Number.MAX_SAFE_INTEGER) && inteiro(preco, 1, Number.MAX_SAFE_INTEGER)
@@ -418,6 +426,12 @@
   function produtoPorId(id) {
     const linha = loja().querySelector(`[data-shop-row="${CSS.escape(id)}"]`);
     return linha && produto(linha);
+  }
+
+  function opcaoRevive(regra) {
+    if (!regra || !jogo('#revive-select .custom-select-trigger:not(:disabled)[aria-expanded="false"]')) return;
+    const id = regra.id.split(":")[1];
+    return jogo(`[data-custom-select-owner="revive-select"] button[data-value="${id}"][aria-selected="false"]:not(:disabled)`);
   }
 
   function mostrarEstoque() {
@@ -613,7 +627,7 @@
   async function comprar(regra, reserva, reservar) {
     abaLoja("shop");
     const item = produtoPorId(regra.id);
-    if (!item) throw new Error("O produto escolhido não aparece mais na loja.");
+    if (!item || item.tipo !== regra.tipo) throw new Error("O produto escolhido não aparece mais na loja.");
     if (item.estoque > regra.minimo) return;
     const custo = item.preco * regra.qtd;
     if (!Number.isSafeInteger(custo + reserva)) {
@@ -871,19 +885,25 @@
     try {
       const salva = JSON.parse(sessionStorage.getItem(chaveSessao));
       if (!salva || typeof salva.treinador !== "string" || !salva.treinador ||
-          !Array.isArray(salva.compras) || salva.compras.length > 2 ||
+          !Array.isArray(salva.compras) || salva.compras.length > tiposCompra.length ||
           !["", "baratos", "marcados"].includes(salva.modoVenda) ||
           !inteiro(salva.reserva, 0, 999_999_999)) return null;
-      const { compras, modoVenda, filtroPokemon } = salva;
-      if (!compras.length && !modoVenda && !filtroPokemon) return null;
-      if (!compras.every(compraValida) || (filtroPokemon && !filtroPokemonValido(filtroPokemon))) return null;
-      return salva;
+      const compras = salva.compras.map(regra => {
+        if (regra?.tipo !== undefined || typeof regra?.id !== "string") return regra;
+        // Sessões antigas só compravam bolas e poções.
+        return { ...regra, tipo: regra.id.startsWith("ball:") ? "bola" : "pocao" };
+      });
+      if (!compras.length && !salva.modoVenda && !salva.filtroPokemon) return null;
+      if (!compras.every(compraValida) || new Set(compras.map(regra => regra.tipo)).size !== compras.length ||
+          new Set(compras.map(regra => regra.id)).size !== compras.length ||
+          (salva.filtroPokemon && !filtroPokemonValido(salva.filtroPokemon))) return null;
+      return { ...salva, compras };
     } catch { return null; }
   }
 
   function definirSessao(configuracao) {
     sessao = configuracao && { ...configuracao, proximas: new Map(), avisos: new Map() };
-    const bola = sessao?.compras.find(regra => regra.id.startsWith("ball:"));
+    const bola = sessao?.compras.find(regra => regra.tipo === "bola");
     raiz.dataset.multipokeTreinadorReposicaoAtiva = bola ? sessao.treinador : "";
     raiz.dataset.multipokeBolaReposicaoAtiva = bola?.id ?? "";
     try {
@@ -957,7 +977,8 @@
     const continua = () => sessao === atual && treinador() === atual.treinador &&
       inicio === interacoes && !document.hidden && jogoDisponivel();
     const emCacada = cacada();
-    const compras = emCacada ? atual.compras : [];
+    const revive = atual.compras.find(regra => regra.tipo === "revive");
+    const compras = emCacada ? atual.compras : revive ? [revive] : [];
     const modoVenda = emCacada && atual.modoVenda;
     const podeVenderPokemon = atual.filtroPokemon && (emCacada || huntAtiva());
     if (!compras.length && !modoVenda && !podeVenderPokemon) return aguardar("Aguardando uma caçada compatível com as operações escolhidas.");
@@ -971,18 +992,22 @@
     const comprasDevidas = compras.filter(regra => devida(regra.id));
     const lootDevido = modoVenda && catalogo && devida("loot");
     const pokemonDevido = podeVenderPokemon && devida("pokemon");
-    if (!comprasDevidas.length && !lootDevido && !pokemonDevido) {
+    const precisaAbrirLoja = comprasDevidas.length || lootDevido || pokemonDevido;
+    if (!precisaAbrirLoja && !opcaoRevive(revive)) {
       if (modoVenda && !catalogo) informar("Aguardando o catálogo de loot.");
       return;
     }
     ocupada = true;
     try {
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
-        if (!lock || !continua()) return;
+        if (!lock || !continua() || modal() || jogo("#drawer.open")) return;
+        opcaoRevive(revive)?.click();
+        if (!precisaAbrirLoja) return;
         await comLoja(false, async () => {
           for (const regra of comprasDevidas) {
-            if (!continua() || !cacada() || !loja() || modal()) return;
-            const rotulo = regra.id.startsWith("ball:") ? "Reposição de Poké Bolas" : "Reposição de poções";
+            if (!continua() || !loja() || modal()) return;
+            if (regra.tipo !== "revive" && !cacada()) continue;
+            const rotulo = `Reposição de ${rotulosCompra[regra.tipo]}`;
             await operar(atual, regra.id, rotulo, INTERVALO_ESTOQUE, reservar => comprar(regra, atual.reserva, reservar));
           }
           if (lootDevido && continua() && cacada() && loja() && !modal()) {
@@ -997,6 +1022,7 @@
             estoqueLido = true;
           }
         });
+        if (revive && continua() && !modal() && !jogo("#drawer.open")) opcaoRevive(revive)?.click();
       });
       if (sessao === atual) informar([...atual.avisos.values()].join(" · ") ||
         (modoVenda && !catalogo ? "Aguardando o catálogo de loot." : "Aguardando reposição ou itens elegíveis para venda."));
@@ -1025,11 +1051,10 @@
       campo("vender-pokemon").checked = Boolean(config?.filtroPokemon);
       campo("modo-venda").value = config?.modoVenda ?? "";
       if (config) {
-        for (const regra of config.compras) {
-          const tipo = regra.id.startsWith("ball:") ? "bola" : "pocao";
-          escolhasCompra.set(tipo, regra.id);
-          campo(`${tipo}-min`).value = regra.minimo;
-          campo(`${tipo}-qtd`).value = regra.qtd;
+        for (const { tipo, id, minimo, qtd } of config.compras) {
+          escolhasCompra.set(tipo, id);
+          campo(`${tipo}-min`).value = minimo;
+          campo(`${tipo}-qtd`).value = qtd;
         }
         publicarBolaReposicao();
         campo("reserva").value = config.reserva;
@@ -1106,6 +1131,7 @@
     if (ocupada) return;
     if (!estoqueLido || treinador() !== treinadorConfigurado) return informar("Aguarde a leitura automática do estoque.");
     const compras = tiposCompra.map(tipo => ({
+      tipo,
       id: escolhasCompra.get(tipo) ?? campo(tipo).value,
       minimo: campo(`${tipo}-min`).valueAsNumber,
       qtd: campo(`${tipo}-qtd`).valueAsNumber,
@@ -1134,7 +1160,7 @@
       return informar("Confira os produtos, o estoque mínimo, a quantidade e a reserva.");
     }
     definirSessao({ treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva: compras.length ? reserva : 0 });
-    informar("Ativa durante a caçada. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
+    informar("Auto Loja ativa. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
     void ciclo();
   });
 
