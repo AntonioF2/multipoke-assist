@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.30**
+**Versão 1.5.31**
 
 ## Instalar ou atualizar
 
@@ -52,7 +52,7 @@ A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segund
 ## Hunts
 
 - **Análise de hunts** compara até 12 áreas regulares por XP e drops por abate. A estimativa considera o nível, os golpes da equipe, os encontros e os bônus de XP ativos. Com uma medição recente compatível, também estima o rendimento por hora.
-- **Troca de hunt** escolhe a favorita acessível de maior nível no menu **Caçada**. Se nenhuma favorita estiver disponível, escolhe a área acessível de maior nível. Em empate de nível e preferência, mantém a hunt atual. A troca aguarda o primeiro minuto da caçada, exige a aba em foco e respeita cinco minutos entre tentativas de entrada.
+- A aba **Grind** escolhe a favorita acessível de maior nível no menu **Caçada**. Se nenhuma favorita estiver disponível, escolhe a área acessível de maior nível. Em empate de nível e preferência, mantém a hunt atual. A troca aguarda o primeiro minuto da caçada, exige a aba em foco e respeita cinco minutos entre tentativas de entrada.
 
 Com a análise aberta, a troca automática ou os testes ativos, a extensão registra medições em janelas de pelo menos cinco minutos com a mesma formação. O histórico guarda as dez amostras mais recentes por hunt e configuração, além dos recordes. Em **Histórico da mesma equipe**, use **Exportar backup** ou **Importar backup** para guardar ou mesclar os dados em JSON.
 

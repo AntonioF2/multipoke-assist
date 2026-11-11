@@ -324,7 +324,7 @@
       <div id="abas" role="group" aria-label="Seções do MultiPoke Assist">
         <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
         <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">Hunts</button>
-        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Troca de hunt" title="Troca de hunt">Troca</button>
+        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Grind" title="Grind">Grind</button>
         <button id="abrir-tierlist" type="button" aria-controls="aba-tierlist" aria-pressed="false">Tierlist</button>
       </div>
       <section id="aba-loja" aria-labelledby="abrir-loja">
