@@ -1,4 +1,4 @@
-name: Chrome Web Store
+name: MultiPoke Assist
 
 on:
   push:
@@ -39,12 +39,12 @@ jobs:
           node --check loja.js
           node --check ativar.js
           node --check barra.js
-          python3 scripts/chrome_web_store.py package multipoke-autocaptura.zip
+          python3 scripts/chrome_web_store.py package multipoke-assist.zip
 
       - name: Disponibilizar o ZIP
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          path: multipoke-autocaptura.zip
+          path: multipoke-assist.zip
           archive: false
           if-no-files-found: error
 
@@ -72,4 +72,4 @@ jobs:
         if: steps.config.outputs.enabled == 'true'
         env:
           CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-        run: python3 scripts/chrome_web_store.py publish multipoke-autocaptura.zip
+        run: python3 scripts/chrome_web_store.py publish multipoke-assist.zip

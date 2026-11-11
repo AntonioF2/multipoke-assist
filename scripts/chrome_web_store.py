@@ -1,4 +1,4 @@
-"""Empacota a extensão e envia versões à Chrome Web Store API v2."""
+"""Empacota o MultiPoke Assist e envia versões à Chrome Web Store API v2."""
 
 import argparse
 import json

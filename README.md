@@ -1,17 +1,19 @@
-# MultiPoke Autocaptura
+# MultiPoke Assist
 
-Extensão para o Chrome que automatiza capturas no MultiPoke Idle. O painel **Auto Loja** também repõe suprimentos, vende loot e Pokémon, compara hunts e troca de área automaticamente.
+O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.28**
+**Versão 1.5.29**
 
 ## Instalar ou atualizar
 
-1. Na página do repositório, clique em **Code → Download ZIP** e extraia a pasta. Se preferir usar Git, execute `git clone https://github.com/AntonioF2/multipoke-autocaptura.git`.
+1. Na página do [repositório oficial](https://github.com/AntonioF2/multipoke-assist), clique em **Code → Download ZIP** e extraia a pasta. Se preferir usar Git, execute `git clone https://github.com/AntonioF2/multipoke-assist.git`.
 2. No perfil do Chrome em que você joga, abra `chrome://extensions` e ative o **Modo do desenvolvedor**.
 3. Clique em **Carregar sem compactação** e selecione a pasta que contém `manifest.json`.
 4. Abra o jogo e entre com seu treinador. [MultiPoke Idle](https://multipoke.io/jogar)
 
 Para atualizar, substitua os arquivos na pasta da extensão ou execute `git pull --ff-only` na branch `main` do clone. Depois clique em **Recarregar** no cartão da extensão e atualize a aba do jogo.
+
+Em clones anteriores à mudança de nome, atualize o endereço com `git remote set-url origin https://github.com/AntonioF2/multipoke-assist.git`.
 
 ## Autocaptura
 
@@ -19,7 +21,7 @@ A Autocaptura inicia ao abrir a página do jogo e usa o botão **Capturar** nos 
 
 Ao escolher uma Poké Bola para reposição, a extensão mantém essa bola equipada no Auto Helper enquanto a Autocaptura ou a reposição estiver ativa. Se o estoque zerar, a Autocaptura aguarda a reposição e a confirmação da seleção. Escolha **Sem reposição** para usar livremente a bola selecionada no jogo.
 
-## Auto Loja
+## Loja e suprimentos
 
 Use a seta para expandir ou recolher o painel. Arraste pela faixa vermelha para mover o painel ou use as setas do teclado com o cabeçalho em foco. O ícone da extensão mostra ou oculta o painel. A posição e a visibilidade ficam salvas no navegador.
 
@@ -27,7 +29,7 @@ Use a seta para expandir ou recolher o painel. Arraste pela faixa vermelha para 
 
 1. Aguarde a leitura do estoque e selecione os suprimentos que quer repor.
 2. Em **Estoque mín.**, defina o estoque que dispara a compra. Em **Comprar**, informe a quantidade por pedido. Por exemplo, **Estoque mín. 10** e **Comprar 50** repõem 50 unidades quando restarem 10 ou menos.
-3. Defina a **Reserva de Pokédollars** e clique em **Iniciar Auto Loja**. A compra exige saldo para o lote inteiro e para a reserva.
+3. Defina a **Reserva de Pokédollars** e clique em **Iniciar loja**. A compra exige saldo para o lote inteiro e para a reserva.
 
 A Poké Bola, a poção e o revive escolhidos para reposição também são selecionados para uso no Auto Helper enquanto a Autocaptura ou a reposição correspondente estiver ativa. Ao receber estoque, a extensão volta a selecionar o item configurado, inclusive depois de uma troca automática do jogo para um item inferior. Escolha **Sem reposição** para controlar o tipo daquele suprimento pelo próprio jogo. O limiar de HP para usar poções segue a configuração do Auto Helper. A reposição de revive também funciona fora da hunt. [Guia do Auto Helper](https://multipoke.io/pokepedia/guias/auto-helper)
 
@@ -35,7 +37,7 @@ A Poké Bola, a poção e o revive escolhidos para reposição também são sele
 
 Em **Venda automática**, escolha **Somente marcados para venda** para vender apenas itens autorizados ou **Abaixo de 10.000 e itens marcados** para incluir loot elegível abaixo de 10.000 Pokédollars por unidade. Itens a partir de 10.000 exigem autorização individual.
 
-Em **Regras de loot**, busque por nome ou ID e use **Permitir venda** ou **Bloquear venda**. O bloqueio vale em qualquer modo. Antes de vender, a Auto Loja limpa a seleção anterior de loot e confere os itens do lote.
+Em **Permissões de venda por item**, busque por nome ou ID e use **Permitir venda** ou **Bloquear venda**. O bloqueio vale em qualquer modo. Antes de vender, o MultiPoke Assist limpa a seleção anterior de loot e confere os itens do lote.
 
 ### Vender Pokémon
 
@@ -45,7 +47,7 @@ Cada lote reúne até 20 Pokémon, com prioridade para capturas antigas. Iniciai
 
 ### Funcionamento da loja
 
-A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segundos** enquanto o jogo estiver disponível e a aba estiver visível. A Auto Loja pode funcionar com o painel recolhido. A sessão é retomada ao recarregar a mesma aba com o mesmo treinador. Use **Pausar Auto Loja** para interromper as operações e editar as regras.
+A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segundos** enquanto o jogo estiver disponível e a aba estiver visível. A loja pode funcionar com o painel recolhido. A sessão é retomada ao recarregar a mesma aba com o mesmo treinador. Use **Pausar loja** para interromper as operações e editar as regras.
 
 ## Hunts
 

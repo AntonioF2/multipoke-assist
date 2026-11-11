@@ -73,6 +73,7 @@
   const INTERVALO_ESTOQUE = 5_000;
   const PRAZO_COMPROVANTE = 15_000;
   const ESPERA_OPERACAO_INCERTA = 60_000;
+  // As chaves legadas permitem recuperar as configurações das instalações existentes.
   const chaveSessao = "multipoke.auto-loja.sessao";
   const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
   const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
@@ -295,16 +296,16 @@
       p { margin: 8px 0; }
     </style>
     <details id="painel">
-      <summary id="cabecalho" aria-label="Abrir ou recolher Auto Loja">
+      <summary id="cabecalho" aria-label="Abrir ou recolher MultiPoke Assist">
         <span id="seta-painel" title="Abrir ou recolher" aria-hidden="true"></span>
         <span id="arrastar" title="Segure e arraste para mover">
           <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
           <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48" draggable="false">
-          <span><span class="marca">MULTIPOKE</span><span class="titulo">Auto Loja</span></span>
-          <span id="estado" role="status">Offline</span>
+          <span><span class="marca">MULTIPOKE</span><span class="titulo">Assist</span></span>
+          <span id="estado" role="status" title="Estado da reposição e venda automática">Offline</span>
         </span>
       </summary>
-      <div id="abas" role="group" aria-label="Seções da Auto Loja">
+      <div id="abas" role="group" aria-label="Seções do MultiPoke Assist">
         <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
         <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">Hunts</button>
         <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Troca de hunt" title="Troca de hunt">Troca</button>
@@ -369,7 +370,7 @@
         </details>
       </fieldset>
       <div class="acoes-loja">
-        <button id="alternar" type="button">Iniciar Auto Loja</button>
+        <button id="alternar" type="button">Iniciar loja</button>
         <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
         <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
       </div>
@@ -1071,7 +1072,7 @@
       else sessionStorage.removeItem(chaveSessao);
     } catch { /* A configuração permanece ativa nesta página. */ }
     atualizarIndicador();
-    campo("alternar").textContent = sessao ? "Pausar Auto Loja" : "Iniciar Auto Loja";
+    campo("alternar").textContent = sessao ? "Pausar loja" : "Iniciar loja";
     campo("config").disabled = Boolean(sessao) || ocupada;
   }
 
@@ -1285,7 +1286,7 @@
   });
 
   campo("alternar").addEventListener("click", () => {
-    if (sessao) return pausar("Auto Loja pausada.");
+    if (sessao) return pausar("Loja pausada.");
     if (ocupada) return;
     if (!estoqueLido || treinador() !== treinadorConfigurado) return informar("Aguarde a leitura automática do estoque.");
     const compras = tiposCompra.map(tipo => ({
@@ -1318,7 +1319,7 @@
       return informar("Confira os produtos, o estoque mínimo, a quantidade e a reserva.");
     }
     definirSessao({ treinador: treinadorConfigurado, compras, modoVenda, filtroPokemon, reserva: compras.length ? reserva : 0 });
-    informar("Auto Loja ativa. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
+    informar("Loja ativa. Reposição a cada 5 segundos e vendas a cada 30 segundos.");
     void ciclo();
   });
 
@@ -1326,7 +1327,7 @@
   const salva = lerSessao();
   if (salva) {
     definirSessao(salva);
-    aguardar("Retomando a Auto Loja nesta aba.");
+    aguardar("Retomando a loja nesta aba.");
     tentar();
   }
   setInterval(tentar, INTERVALO_ESTOQUE);

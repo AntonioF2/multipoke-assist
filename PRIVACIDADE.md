@@ -1,9 +1,9 @@
-# Privacidade da extensão MultiPoke Autocaptura
+# Privacidade da extensão MultiPoke Assist
 
 A extensão atua no site `multipoke.io`. Ela lê a interface do jogo para identificar o treinador, verificar estoque e saldo, aplicar os filtros de venda e usar os controles de captura, compra e venda. Clicar no ícone da extensão na aba do jogo mostra ou oculta o painel.
 
-A posição e a visibilidade do painel, as preferências de compra e venda e os filtros de Pokémon ficam no armazenamento local do site. As regras de compra e venda são associadas ao nome do treinador. A configuração ativa da Auto Loja fica salva na sessão da aba para retomar após recarregar. A extensão guarda o catálogo público e as medições de hunts no IndexedDB da extensão no seu perfil do Chrome. As medições incluem treinador, formação, níveis, golpes ativos, bônus visíveis, caçada, duração, XP, valor dos drops e abates. O backup em JSON contém o histórico de medições e é salvo no local que você escolher.
+A posição e a visibilidade do painel, as preferências de compra e venda e os filtros de Pokémon ficam no armazenamento local do site. As regras de compra e venda são associadas ao nome do treinador. A configuração ativa da loja fica salva na sessão da aba para retomar após recarregar. A extensão guarda o catálogo público e as medições de hunts no IndexedDB da extensão no seu perfil do Chrome. As medições incluem treinador, formação, níveis, golpes ativos, bônus visíveis, caçada, duração, XP, valor dos drops e abates. O backup em JSON contém o histórico de medições e é salvo no local que você escolher.
 
 A extensão consulta as páginas públicas de itens, hunts, espécies e golpes do MultiPoke e a tabela pública de XP da PokéAPI, sem enviar credenciais nessas consultas. A tierlist usa o catálogo público da Pokepédia salvo no IndexedDB e carrega os ícones do repositório público de sprites da PokéAPI no GitHub, sem enviar credenciais ou o endereço da página do jogo. O próprio MultiPoke processa as ações feitas com os controles do jogo. A extensão não envia os dados lidos do jogo aos desenvolvedores da extensão ou a serviços de análise ou publicidade. Os dados são usados para operar as funções descritas nesta página, conforme os requisitos de uso limitado da Chrome Web Store.
 
-Para dúvidas sobre os dados tratados pela extensão, use o [repositório do projeto](https://github.com/AntonioF2/multipoke-autocaptura).
+Para dúvidas sobre os dados tratados pela extensão, use o [repositório do projeto](https://github.com/AntonioF2/multipoke-assist).

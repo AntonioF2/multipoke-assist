@@ -20,6 +20,6 @@ chrome.action.onClicked.addListener(async aba => {
   try {
     await chrome.scripting.executeScript({ target: { tabId: aba.id }, func: alternarPainel });
   } catch (erro) {
-    console.warn("Não foi possível alternar o painel do MultiPoke.", erro);
+    console.warn("Não foi possível alternar o painel do MultiPoke Assist.", erro);
   }
 });
