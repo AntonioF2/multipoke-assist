@@ -112,78 +112,129 @@
   interfaceLoja.innerHTML = `
     <style>
       :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: light;
-        --azul: #203961; --vermelho: #b92033; --amarelo: #ffcb36; --papel: #fffdf6; }
+        --azul: #223754; --vermelho: #a92338; --amarelo: #f3c851; --papel: #f5f7fb;
+        --borda: #dce3ed; --muted: #637189; }
       :host([hidden]) { display: none; }
-      #painel { box-sizing: border-box; width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
-        background: var(--papel); border: 2px solid var(--azul); border-radius: 12px;
-        box-shadow: 0 4px 0 #152641, 0 10px 24px #101d3340; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
-      #painel[open] { width: 370px; max-height: min(75vh, 580px); overflow: auto; }
+      *, *::before, *::after { box-sizing: border-box; }
+      #painel { width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
+        background: var(--papel); border: 1px solid #263c59; border-radius: 15px;
+        box-shadow: 0 16px 48px #111c3545, 0 2px 8px #111c3520; overflow: hidden;
+        font: 13px/1.5 system-ui, sans-serif; scrollbar-width: thin; scrollbar-color: #b7c4d7 transparent; }
+      #painel[open] { width: 440px; max-height: min(86vh, 800px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      #painel > summary { position: sticky; top: 0; z-index: 1; display: flex; list-style: none;
+      #painel > summary { position: sticky; top: 0; z-index: 3; display: flex; height: 74px; list-style: none;
         background: var(--vermelho); border-bottom: 3px solid var(--amarelo); color: #fff; }
       #painel > summary::-webkit-details-marker { display: none; }
       #seta-painel { width: 32px; flex: 0 0 auto; display: grid; place-items: center; }
-      #seta-painel:hover { background: #811827; }
+      #seta-painel:hover { background: #ffffff12; }
       #seta-painel::before { content: ""; width: 7px; height: 7px; border: solid #fff;
         border-width: 0 2px 2px 0; transform: rotate(-45deg); }
       #painel[open] #seta-painel::before { transform: rotate(45deg); }
-      #arrastar { display: flex; align-items: center; flex: 1; gap: 8px; padding: 7px 12px 7px 4px;
+      #arrastar { display: flex; align-items: center; flex: 1; gap: 11px; padding: 10px 18px 10px 2px;
         cursor: grab; touch-action: none; user-select: none; }
       #arrastar:active { cursor: grabbing; }
-      #dragonite { width: 48px; height: 48px; flex: 0 0 auto; background: #fff5d6;
-        border: 1px solid var(--amarelo); border-radius: 8px; object-fit: contain; image-rendering: pixelated; }
-      .titulo { display: block; color: var(--amarelo); font-size: 19px; font-weight: 900;
-        text-shadow: 1px 2px var(--azul); white-space: nowrap; }
-      #estado { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
-      #estado::before { content: ""; width: 8px; height: 8px; border-radius: 50%;
-        background: #5f0715; border: 1px solid #ffb4bf; }
-      #estado[data-ativa]::before { background: #54ff72; border-color: #ceffd5;
-        box-shadow: 0 0 7px #54ff72; }
-      #estado[data-aguardando]::before { background: var(--amarelo); border-color: #fff5d6;
-        box-shadow: none; }
-      #abas { display: flex; gap: 6px; margin: 9px 12px 6px; }
-      #abas button { flex: 1; border: 1px solid #a6b7d0; border-radius: 6px; padding: 5px 6px;
-        background: #edf3ff; color: var(--azul); font-weight: 700; }
-      #abas button[aria-pressed="true"] { background: var(--azul); color: #fff; }
-      #aba-hunts, #aba-troca { padding: 0 12px 12px; }
-      #aba-hunts h3 { margin: 10px 0 4px; font-size: 14px; }
-      .hunt-resumo { margin: 8px 0; padding: 7px 9px; background: #edf3ff; border-radius: 6px; }
+      #dragonite { width: 44px; height: 44px; flex: 0 0 auto; background: #fff5d6;
+        border: 1px solid #e4b74f; border-radius: 10px; object-fit: contain; image-rendering: pixelated; }
+      .marca { display: block; color: #f6d7da; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+      .titulo { display: block; color: #fff; font-size: 21px; font-weight: 800; letter-spacing: -.5px; white-space: nowrap; }
+      #estado { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 9px;
+        background: #65132555; border: 1px solid #ffffff28; border-radius: 20px; font-size: 11px; font-weight: 600; }
+      #estado::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #e8a2ac; }
+      #estado[data-ativa]::before { background: #8ee6a0; box-shadow: 0 0 0 3px #8ee6a018; }
+      #estado[data-aguardando]::before { background: var(--amarelo); box-shadow: none; }
+      #abas { position: sticky; top: 74px; z-index: 2; display: flex; gap: 4px; padding: 10px 14px;
+        background: var(--papel); border-bottom: 1px solid var(--borda); }
+      #abas button { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 8px; padding: 8px 5px;
+        background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
+      #abas button:hover { background: #e9eef6; }
+      #abas button[aria-pressed="true"] { background: #fff; border-color: var(--borda); color: var(--azul);
+        box-shadow: 0 1px 3px #22375409; }
+      #aba-hunts, #aba-troca { padding: 14px; }
+      #aba-hunts h3 { margin: 18px 0 9px; font-size: 13px; }
+      .hunt-resumo { margin: 8px 0; padding: 12px; background: #fff; border: 1px solid var(--borda); border-radius: 10px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
+      .hunt-resumo strong { margin-bottom: 4px; font-size: 11px; color: var(--muted); }
       #hunt-historico, #hunt-comparacao { white-space: pre-line; }
       #hunt-comparacao { max-height: 250px; overflow: auto; }
-      #hunt-medicao, #aba-hunts small { color: #445b7d; }
-      .regras { margin-top: 8px; padding: 6px 8px; background: #edf3ff; border-radius: 6px; }
-      .regras > summary { font-weight: 700; }
-      #regras-pokemon label { margin: 3px 0; }
-      #pokemon-qualidade { width: 76px; }
-      fieldset { margin: 0; padding: 0 12px; border: 0; min-width: 0; }
-      fieldset > div { margin: 8px 0; }
-      label { display: inline-block; }
-      input[type=number] { width: 76px; }
-      select { max-width: 100%; }
+      #hunt-medicao, small { color: var(--muted); }
+      small { font-size: 11px; line-height: 1.6; }
+      fieldset { margin: 0; padding: 14px; border: 0; min-width: 0; display: grid; gap: 12px; }
+      .bloco-config { min-width: 0; padding: 14px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; }
+      .bloco-config h3 { margin: 0; font-size: 13px; font-weight: 750; }
+      .descricao { margin: 3px 0 14px; color: var(--muted); font-size: 11px; }
+      #estoque-status { margin: 0; padding: 10px 12px; color: #405b7e; background: #eaf0f9;
+        border: 1px solid #dbe5f3; border-radius: 9px; font-size: 12px; }
+      .linha-reposicao { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px; align-items: end; gap: 8px; }
+      .linha-reposicao + .linha-reposicao { padding-top: 12px; margin-top: 12px; border-top: 1px solid #edf0f5; }
+      .campo { display: grid; min-width: 0; gap: 6px; color: #415470; font-size: 11px; font-weight: 650; }
+      .campo select, .campo input { width: 100%; min-width: 0; font-size: 12px; font-weight: 500; }
+      .linha-reposicao input { text-align: center; }
+      .reserva { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borda); }
+      .entrada-moeda { display: flex; align-items: center; gap: 8px; }
+      .entrada-moeda > span { font-size: 14px; color: #8896aa; }
+      .entrada-moeda input { flex: 1; }
+      .nota { margin: 12px 0 0; padding: 9px 11px; background: #faf7ed; border-left: 2px solid #e4c364;
+        border-radius: 0 7px 7px 0; color: #7c704d; font-size: 11px; line-height: 1.55; }
+      .regras { margin-top: 12px; background: #f7f9fc; border: 1px solid var(--borda); border-radius: 9px; }
+      .regras > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 11px 12px; font-size: 12px; font-weight: 650; list-style: none; }
+      .regras > summary::-webkit-details-marker { display: none; }
+      .regras > summary::after { content: ""; flex: 0 0 auto; width: 6px; height: 6px;
+        margin-right: 2px; border: solid #7b8ca5; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+      .regras[open] > summary::after { transform: rotate(225deg); }
+      .regras[open] > summary { border-bottom: 1px solid var(--borda); }
+      .conteudo-regras { padding: 12px; }
+      .regras > p, .regras > button, .regras > input { margin-left: 12px; margin-right: 12px; }
+      .regras > p { margin-bottom: 12px; }
+      #regras-pokemon { margin: 0; padding: 0; background: #fff; border-radius: 12px; }
+      #regras-pokemon > summary { padding: 14px; font-size: 13px; }
+      #regras-pokemon > summary small { display: block; margin-top: 2px; font-weight: 400; }
+      #regras-pokemon .conteudo-regras { padding: 14px; }
+      .grade-filtros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+      .opcao-check { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 550; cursor: pointer; }
+      input[type=checkbox] { width: 16px; height: 16px; min-height: 0; margin: 0; flex: 0 0 auto; accent-color: #355985; }
       button, select, input { font: inherit; }
-      select, input { box-sizing: border-box; min-height: 26px; padding: 2px 5px;
-        border: 1px solid #a6b7d0; border-radius: 5px; background: #fff; color: var(--azul); }
-      select:disabled, input:disabled { background: #edf1f7; color: #5b6c87; cursor: default; }
-      :is(summary, button, select, input):focus-visible { outline: 2px solid #2d61b1; outline-offset: 2px; }
+      button { transition: background-color .12s, border-color .12s; }
+      select, input { min-height: 36px; max-width: 100%; padding: 7px 9px; border: 1px solid #cfd8e5;
+        border-radius: 7px; background: #fff; color: var(--azul); }
+      select { padding-right: 28px; appearance: none; text-overflow: ellipsis;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m5 6 3 3 3-3' fill='none' stroke='%23637189' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 8px center; }
+      select:hover:not(:disabled), input:hover:not(:disabled) { border-color: #91a5c0; }
+      select:disabled, input:disabled { background-color: #f2f5f9; color: #738198; cursor: default; }
+      fieldset:disabled .campo { color: #738198; }
+      :is(summary, button, select, input):focus-visible { outline: 2px solid #6286b6; outline-offset: 2px; }
       #painel > summary:focus-visible { outline-color: var(--amarelo); outline-offset: -3px; }
-      #buscar-loot { box-sizing: border-box; width: 100%; margin: 6px 0; }
-      .loot { display: grid; max-height: 170px; overflow: auto; }
+      #buscar-loot { width: 100%; margin-bottom: 10px; }
+      .loot { display: grid; max-height: 210px; overflow: auto; scrollbar-width: thin; }
       .regra-loot { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px;
-        padding: 5px 2px; border-bottom: 1px solid #c5d4ec; }
-      .controles-loot { display: grid; gap: 4px; }
-      .controles-loot label { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-      .controles-loot input { min-height: 0; margin: 0; }
-      .loot small { display: block; color: #445b7d; }
-      #alternar, #alternar-captura { display: block; width: calc(100% - 24px); margin: 12px 12px 0; padding: 7px;
-        border-radius: 7px; font-weight: 800; }
-      #alternar { background: var(--amarelo); border: 1px solid var(--azul); color: var(--azul); }
-      #alternar:hover { background: #ffda67; }
-      #alternar-captura { margin-top: 8px; background: #efe5ff; color: #461b72; border: 1px solid #6e37a8; }
-      #alternar-captura:hover { background: #e4d1ff; }
-      #alternar-captura[aria-pressed="true"] { background: #652bb0; color: white; }
-      #alternar-captura[aria-pressed="true"]:hover { background: #51208e; }
-      #mensagem { margin: 8px 12px 12px; color: #445b7d; font-size: 12px; }
+        padding: 10px 0; border-bottom: 1px solid var(--borda); }
+      .regra-loot:last-child { border-bottom: 0; }
+      .controles-loot { display: grid; gap: 7px; }
+      .controles-loot label { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 11px; }
+      .loot small { display: block; margin-top: 2px; }
+      .acoes-loja { position: sticky; bottom: 0; z-index: 2; display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 14px;
+        background: var(--papel); border-top: 1px solid var(--borda); box-shadow: 0 -4px 12px #22375405; }
+      #alternar, #alternar-captura, #troca-alternar { display: block; width: 100%; padding: 10px 12px;
+        border-radius: 8px; font-size: 12px; font-weight: 750; }
+      #alternar, #troca-alternar { background: var(--azul); border: 1px solid var(--azul); color: #fff; }
+      #alternar:hover, #troca-alternar:hover { background: #314f76; }
+      #alternar-captura { background: #f0eafa; color: #653993; border: 1px solid #ded0ef; }
+      #alternar-captura:hover { background: #e6dbf5; }
+      #alternar-captura[aria-pressed="true"] { background: #705096; border-color: #705096; color: #fff; }
+      #alternar-captura[aria-pressed="true"]:hover { background: #5f4184; }
+      #mensagem { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+      #hunt-exportar, #hunt-importar { padding: 7px 10px; border: 1px solid #cfd8e5; border-radius: 7px;
+        background: #fff; color: var(--azul); font-size: 11px; }
+      #troca-status { padding: 12px; background: #eaf0f9; border-radius: 9px; color: #405b7e; }
+      @media (max-width: 480px) {
+        .linha-reposicao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .linha-reposicao > .campo:first-child { grid-column: 1 / -1; }
+        #arrastar { gap: 8px; padding-right: 12px; }
+        #estado { font-size: 10px; padding: 4px 7px; }
+      }
+      @media (prefers-reduced-motion: reduce) { button { transition: none; } }
       p { margin: 8px 0; }
     </style>
     <details id="painel">
@@ -192,7 +243,8 @@
         <span id="arrastar" title="Segure e arraste para mover">
           <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
           <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48" draggable="false">
-          <span><span class="titulo">Auto Loja</span><span id="estado" role="status">Offline</span></span>
+          <span><span class="marca">MULTIPOKE</span><span class="titulo">Auto Loja</span></span>
+          <span id="estado" role="status">Offline</span>
         </span>
       </summary>
       <div id="abas" role="group" aria-label="Seções da Auto Loja">
@@ -203,43 +255,66 @@
       <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
         <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
-        <div><label>Poké Bola <select id="bola"><option value="">Sem reposição</option></select></label>
-          <br><label>Até <input id="bola-min" type="number" min="0" max="10000" value="10"></label>
-          <label>Comprar <input id="bola-qtd" type="number" min="1" max="10000" value="50"></label></div>
-        <div><label>Poção <select id="pocao"><option value="">Sem reposição</option></select></label>
-          <br><label>Até <input id="pocao-min" type="number" min="0" max="10000" value="5"></label>
-          <label>Comprar <input id="pocao-qtd" type="number" min="1" max="10000" value="25"></label></div>
-        <div><label>Revive <select id="revive"><option value="">Sem reposição</option></select></label>
-          <br><label>Até <input id="revive-min" type="number" min="0" max="10000" value="2"></label>
-          <label>Comprar <input id="revive-qtd" type="number" min="1" max="10000" value="5"></label></div>
-        <p><small>Os suprimentos escolhidos para reposição também são selecionados para uso no Auto Helper.</small></p>
-        <div><label>Reserva de Pokédollars <input id="reserva" type="number" min="0" max="999999999" value="200"></label></div>
-        <div><label>Venda automática <select id="modo-venda">
+        <section class="bloco-config" aria-labelledby="titulo-reposicao">
+          <h3 id="titulo-reposicao">Reposição de suprimentos</h3>
+          <p class="descricao">Escolha os itens e a quantidade de cada compra.</p>
+          <div class="linha-reposicao">
+            <label class="campo"><span>Poké Bola</span><select id="bola"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span>Estoque mín.</span><input id="bola-min" type="number" min="0" max="10000" value="10"></label>
+            <label class="campo"><span>Comprar</span><input id="bola-qtd" type="number" min="1" max="10000" value="50"></label>
+          </div>
+          <div class="linha-reposicao">
+            <label class="campo"><span>Poção</span><select id="pocao"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span>Estoque mín.</span><input id="pocao-min" type="number" min="0" max="10000" value="5"></label>
+            <label class="campo"><span>Comprar</span><input id="pocao-qtd" type="number" min="1" max="10000" value="25"></label>
+          </div>
+          <div class="linha-reposicao">
+            <label class="campo"><span>Revive</span><select id="revive"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span>Estoque mín.</span><input id="revive-min" type="number" min="0" max="10000" value="2"></label>
+            <label class="campo"><span>Comprar</span><input id="revive-qtd" type="number" min="1" max="10000" value="5"></label>
+          </div>
+          <label class="campo reserva"><span>Reserva de Pokédollars</span>
+            <span class="entrada-moeda"><span aria-hidden="true">$</span><input id="reserva" type="number" min="0" max="999999999" value="200"></span>
+          </label>
+          <p class="nota">Os itens escolhidos também são selecionados para uso no Auto Helper.</p>
+        </section>
+        <section class="bloco-config" aria-labelledby="titulo-loot">
+          <h3 id="titulo-loot">Venda de loot</h3>
+          <p class="descricao">Defina os itens que podem ser vendidos.</p>
+          <label class="campo"><span>Venda automática</span><select id="modo-venda">
             <option value="">Desligada</option>
             <option value="marcados">Somente marcados para venda</option>
             <option value="baratos">Abaixo de 10.000 e itens marcados</option>
           </select></label>
           <details id="regras-loot" class="regras">
-            <summary>Regras de loot</summary>
-            <input id="buscar-loot" type="search" placeholder="Buscar loot por nome ou ID" aria-label="Buscar loot por nome ou ID">
-            <div id="loot" class="loot">Carregando o catálogo de loot…</div>
+            <summary>Permissões de venda por item</summary>
+            <div class="conteudo-regras">
+              <input id="buscar-loot" type="search" placeholder="Buscar por nome ou ID" aria-label="Buscar loot por nome ou ID">
+              <div id="loot" class="loot">Carregando o catálogo de loot…</div>
+            </div>
           </details>
-        </div>
-        <details id="regras-pokemon" class="regras">
-          <summary>Venda de Pokémon</summary>
-          <label><input id="vender-pokemon" type="checkbox"> Ativar venda de Pokémon</label><br>
-          <label>Qualidade abaixo de <input id="pokemon-qualidade" type="text" inputmode="decimal" placeholder="1,30" maxlength="4"></label><br>
-          <label>IV total abaixo de <input id="pokemon-iv" type="number" min="6" max="193" placeholder="80"></label><br>
-          <label>Combinar filtros <select id="pokemon-condicao">
-            <option value="e">E · precisa cumprir os dois</option>
-            <option value="ou">OU · basta cumprir um</option>
-          </select></label>
-          <p><small>Preencha pelo menos um limite. Qualidade Lendária ou superior fica protegida.</small></p>
+        </section>
+        <details id="regras-pokemon" class="bloco-config regras">
+          <summary><span>Venda de Pokémon<small>Filtros de qualidade e IV</small></span></summary>
+          <div class="conteudo-regras">
+            <label class="opcao-check"><input id="vender-pokemon" type="checkbox"><span>Ativar venda de Pokémon</span></label>
+            <div class="grade-filtros">
+              <label class="campo"><span>Qualidade abaixo de</span><input id="pokemon-qualidade" type="text" inputmode="decimal" placeholder="1,30" maxlength="4"></label>
+              <label class="campo"><span>IV total abaixo de</span><input id="pokemon-iv" type="number" min="6" max="193" placeholder="80"></label>
+            </div>
+            <label class="campo"><span>Combinar filtros</span><select id="pokemon-condicao">
+              <option value="e">E · precisa cumprir os dois</option>
+              <option value="ou">OU · basta cumprir um</option>
+            </select></label>
+            <p class="nota">Preencha pelo menos um limite. Qualidade Lendária ou superior fica protegida.</p>
+          </div>
         </details>
       </fieldset>
-      <button id="alternar" type="button">Iniciar Auto Loja</button>
-      <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
-      <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
+      <div class="acoes-loja">
+        <button id="alternar" type="button">Iniciar Auto Loja</button>
+        <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
+        <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
+      </div>
       </section>
       <section id="aba-hunts" aria-labelledby="abrir-hunts" hidden>
         <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
