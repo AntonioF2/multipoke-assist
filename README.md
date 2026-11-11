@@ -2,7 +2,7 @@
 
 Extensão para o Chrome que automatiza capturas no MultiPoke Idle. O painel **Auto Loja** também repõe suprimentos, vende loot e Pokémon, compara hunts e troca de área automaticamente.
 
-**Versão 1.5.26**
+**Versão 1.5.27**
 
 ## Instalar ou atualizar
 
@@ -54,8 +54,14 @@ A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segund
 
 Com a análise aberta ou a troca automática ativa, a extensão registra medições em janelas de pelo menos cinco minutos com a mesma formação e pelo menos um abate. O histórico guarda as dez amostras mais recentes por hunt e configuração, além dos recordes. Em **Histórico da mesma equipe**, use **Exportar backup** ou **Importar backup** para guardar ou mesclar os dados em JSON.
 
+## Tierlist de Pokémon
+
+A aba **Tierlist** agrupa todas as espécies do catálogo da Pokepédia por rank, de **SS** a **D**. Escolha um rank ou use a busca por nome ou número para encontrar um Pokémon e clique no seu ícone para abrir a ficha em outra aba. Os ranks seguem a classificação de cada espécie publicada pelo jogo. [Guia de ranks](https://multipoke.io/pokepedia/guias/ranks)
+
+O catálogo é carregado ao abrir a aba e reaproveitado no IndexedDB. As imagens são carregadas conforme os Pokémon entram na área visível.
+
 ## Privacidade e créditos
 
 Os dados de configuração e histórico são armazenados no navegador. [Política de privacidade](PRIVACIDADE.md)
 
-Os catálogos de itens e hunts vêm da Pokepédia do MultiPoke. Os dados de XP base e o sprite de Dragonite vêm da PokéAPI. [Pokepédia](https://multipoke.io/pokepedia/hunts) · [PokéAPI](https://pokeapi.co/) · [Sprite de Dragonite](https://github.com/PokeAPI/sprites/blob/master/sprites/pokemon/versions/generation-iv/heartgold-soulsilver/149.png)
+Os catálogos de itens, hunts e ranks vêm da Pokepédia do MultiPoke. Os dados de XP base, o sprite de Dragonite e os ícones de Pokémon da tierlist vêm da PokéAPI. [Pokepédia](https://multipoke.io/pokepedia/hunts) · [PokéAPI](https://pokeapi.co/) · [Sprites](https://github.com/PokeAPI/sprites)

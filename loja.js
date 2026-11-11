@@ -149,7 +149,7 @@
       #abas button:hover { background: #e9eef6; }
       #abas button[aria-pressed="true"] { background: #fff; border-color: var(--borda); color: var(--azul);
         box-shadow: 0 1px 3px #22375409; }
-      #aba-hunts, #aba-troca { padding: 14px; }
+      #aba-hunts, #aba-troca, #aba-tierlist { padding: 14px; }
       #aba-hunts h3 { margin: 18px 0 9px; font-size: 13px; }
       .hunt-resumo { margin: 8px 0; padding: 12px; background: #fff; border: 1px solid var(--borda); border-radius: 10px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
@@ -228,6 +228,48 @@
       #hunt-exportar, #hunt-importar { padding: 7px 10px; border: 1px solid #cfd8e5; border-radius: 7px;
         background: #fff; color: var(--azul); font-size: 11px; }
       #troca-status { padding: 12px; background: #eaf0f9; border-radius: 9px; color: #405b7e; }
+      .tier-apresentacao { padding: 16px; background: var(--azul); color: #fff; border-radius: 12px; }
+      .tier-apresentacao > span { color: #b9cbe3; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+      .tier-apresentacao h3 { margin: 4px 0 6px; font-size: 20px; letter-spacing: -.4px; }
+      .tier-apresentacao p { margin: 0 0 10px; color: #d4dfef; font-size: 11px; }
+      .tier-apresentacao a { color: #f3d174; font-size: 11px; text-underline-offset: 3px; }
+      #tierlist-busca { width: 100%; margin-top: 14px; font-size: 12px; }
+      #tierlist-ranks { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 10px; }
+      #tierlist-ranks button { min-width: 0; padding: 6px 2px; border: 1px solid var(--borda);
+        border-radius: 7px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 700; }
+      #tierlist-ranks button:hover { border-color: #91a5c0; }
+      #tierlist-ranks button[aria-pressed="true"] { background: var(--azul); border-color: var(--azul); color: #fff; }
+      #tierlist-status { margin: 9px 0 12px; color: var(--muted); font-size: 11px; }
+      #tierlist-tentar { padding: 8px 12px; margin-bottom: 12px; border: 1px solid var(--azul);
+        border-radius: 7px; background: var(--azul); color: #fff; font-size: 12px; }
+      #tierlist-lista { display: grid; gap: 12px; }
+      .tier-grupo { border: 1px solid var(--borda); border-top: 3px solid var(--rank-cor);
+        border-radius: 11px; background: #fff; overflow: hidden; }
+      .tier-grupo[data-rank="SS"] { --rank-cor: #7951aa; --rank-fundo: #f1eafa; }
+      .tier-grupo[data-rank="S"] { --rank-cor: #97701c; --rank-fundo: #fff4d7; }
+      .tier-grupo[data-rank="A"] { --rank-cor: #ae4857; --rank-fundo: #fff0f1; }
+      .tier-grupo[data-rank="B"] { --rank-cor: #426fa6; --rank-fundo: #edf3fc; }
+      .tier-grupo[data-rank="C"] { --rank-cor: #317e75; --rank-fundo: #eaf6f3; }
+      .tier-grupo[data-rank="D"] { --rank-cor: #68778d; --rank-fundo: #f1f4f8; }
+      .tier-cabecalho { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+        border-bottom: 1px solid var(--borda); }
+      .tier-selo { display: grid; place-items: center; width: 36px; height: 36px;
+        border-radius: 9px; background: var(--rank-fundo); color: var(--rank-cor); font-size: 17px; font-weight: 850; }
+      .tier-cabecalho h4 { margin: 0; font-size: 13px; }
+      .tier-contador { margin-left: auto; color: var(--muted); font-size: 11px; }
+      .tier-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; padding: 10px; }
+      .tier-pokemon { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0;
+        padding: 2px 2px 7px; border: 1px solid transparent; border-radius: 8px; background: #f7f9fc;
+        color: var(--azul); text-decoration: none; }
+      .tier-pokemon:hover { background: var(--rank-fundo); border-color: var(--rank-cor); }
+      .tier-pokemon:focus-visible, .tier-apresentacao a:focus-visible { outline: 2px solid #6286b6; outline-offset: 2px; }
+      .tier-pokemon[hidden] { display: none; }
+      .tier-icone { display: grid; place-items: center; width: 56px; height: 56px; }
+      .tier-icone img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+      .tier-icone.sem-icone::after { content: attr(data-numero); color: var(--muted); font-size: 11px; }
+      .tier-nome { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-size: 10px; font-weight: 550; }
+      .tier-vazio { margin: 0; padding: 0 12px 12px; font-size: 11px; color: var(--muted); }
       @media (max-width: 480px) {
         .linha-reposicao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .linha-reposicao > .campo:first-child { grid-column: 1 / -1; }
@@ -249,8 +291,9 @@
       </summary>
       <div id="abas" role="group" aria-label="Seções da Auto Loja">
         <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
-        <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false">Análise de hunts</button>
-        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false">Troca de hunt</button>
+        <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">Hunts</button>
+        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Troca de hunt" title="Troca de hunt">Troca</button>
+        <button id="abrir-tierlist" type="button" aria-controls="aba-tierlist" aria-pressed="false">Tierlist</button>
       </div>
       <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
@@ -349,6 +392,19 @@
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
       </section>
+      <section id="aba-tierlist" aria-labelledby="abrir-tierlist" hidden>
+        <div class="tier-apresentacao">
+          <span>POKEPÉDIA · RANKS OFICIAIS</span>
+          <h3>Tierlist de Pokémon</h3>
+          <p>Explore os ranks e clique em um Pokémon para abrir sua ficha.</p>
+          <a href="https://multipoke.io/pokepedia/guias/ranks" target="_blank" rel="noopener noreferrer">Como funcionam os ranks ↗</a>
+        </div>
+        <input id="tierlist-busca" type="search" placeholder="Nome ou número na Pokédex" aria-label="Buscar Pokémon por nome ou número" autocomplete="off">
+        <div id="tierlist-ranks" role="group" aria-label="Filtrar Pokémon por rank"></div>
+        <p id="tierlist-status" role="status">Abra esta aba para consultar os ranks.</p>
+        <button id="tierlist-tentar" type="button" hidden>Tentar novamente</button>
+        <div id="tierlist-lista" aria-busy="false"></div>
+      </section>
     </details>`;
   document.body.append(painel);
 
@@ -356,7 +412,8 @@
   const lojaVisivel = () => campo("painel").open && !campo("aba-loja").hidden;
   const trocaHunts = criarTrocaHunts(campo, { formatar, treinador, podeInteragir: () => !ocupada });
   const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts });
-  const abas = ["loja", "hunts", "troca"];
+  const atualizarTierlist = criarTierlist(campo, { normalizar });
+  const abas = ["loja", "hunts", "troca", "tierlist"];
   for (const aba of abas) {
     campo(`abrir-${aba}`).addEventListener("click", () => {
       for (const nome of abas) {
@@ -364,6 +421,7 @@
         campo(`aba-${nome}`).hidden = nome !== aba;
       }
       if (aba === "loja") void atualizarEstoque();
+      else if (aba === "tierlist") void atualizarTierlist();
       else void atualizarAnalise();
     });
   }
@@ -1168,6 +1226,7 @@
   campo("modo-venda").addEventListener("change", mostrarCatalogo);
   campo("painel").addEventListener("toggle", () => {
     if (!campo("aba-loja").hidden) void atualizarEstoque();
+    else if (!campo("aba-tierlist").hidden && campo("painel").open) void atualizarTierlist();
     else void atualizarAnalise();
   });
   for (const id of camposCompra) {
