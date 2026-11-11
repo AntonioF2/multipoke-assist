@@ -30,6 +30,7 @@ jobs:
       - name: Validar e empacotar
         run: |
           node --check autocaptura.js
+          node --check avisos.js
           node --check combate-hunts.js
           node --check dados-hunts.js
           node --check banco-hunts.js
