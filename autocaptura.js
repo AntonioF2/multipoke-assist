@@ -14,20 +14,30 @@
   }
 
   const seletor = "#manual-capture button[data-capture-corpse], #economy-hunt button[data-economy-capture]";
+  const seletoresReposicao = { bola: "ball-select", pocao: "potion-select", revive: "revive-select" };
+  const estadosCaptura = { pronta: "ativa", vazio: "sem-bolas", estoque: "aguardando-estoque", selecao: "aguardando-bola" };
   let tentados = new Set();
   const INTERVALO_SELECAO = 2_000;
   let capturaAtiva = false;
-  let selecaoPendente;
+  const selecoesPendentes = new Map();
 
   function clicarSeDisponivel() {
     const treinadorDaCompra = raiz.dataset.multipokeTreinadorReposicaoAtiva;
     if (!capturaAtiva && !treinadorDaCompra) return;
     const treinador = document.querySelector("#party-trainer-name")?.textContent.trim();
-    const compraAtiva = treinador && treinadorDaCompra === treinador
-      ? raiz.dataset.multipokeBolaReposicaoAtiva : "";
-    if (!capturaAtiva && !compraAtiva) return;
-    const bola = (compraAtiva || escolhaBolaReposicao(treinador))?.match(/^ball:(\d+)$/)?.[1];
-    const estado = bola ? sincronizarBola(bola, treinador) : "ativa";
+    const compraDoTreinador = treinador && treinadorDaCompra === treinador;
+    let estado = "ativa";
+    for (const [tipo, seletorItem] of Object.entries(seletoresReposicao)) {
+      const compraAtiva = compraDoTreinador ? raiz.getAttribute(`data-multipoke-${tipo}-reposicao-ativa`) : "";
+      const escolha = compraAtiva || (capturaAtiva ? escolhaReposicao(treinador, tipo) : "");
+      const id = escolha?.match(tipo === "bola" ? /^ball:(\d+)$/ : /^supply:(\d+)$/)?.[1];
+      if (!id) {
+        selecoesPendentes.delete(tipo);
+        continue;
+      }
+      const selecao = sincronizarItem(tipo, seletorItem, id, treinador);
+      if (tipo === "bola") estado = estadosCaptura[selecao];
+    }
     if (!capturaAtiva) return;
     if (raiz.dataset.multipokeAutocaptura !== estado) raiz.dataset.multipokeAutocaptura = estado;
     if (estado !== "ativa") return;
@@ -61,40 +71,43 @@
     proximo?.click();
   }
 
-  function escolhaBolaReposicao(treinador) {
+  function escolhaReposicao(treinador, tipo) {
     if (!treinador) return;
-    if (raiz.dataset.multipokeTreinadorReposicao === treinador) return raiz.dataset.multipokeBolaReposicao;
-    try { return localStorage.getItem(`multipoke.auto-loja.compra.${treinador}.bola`); }
+    if (raiz.dataset.multipokeTreinadorReposicao === treinador) return raiz.getAttribute(`data-multipoke-${tipo}-reposicao`);
+    try { return localStorage.getItem(`multipoke.auto-loja.compra.${treinador}.${tipo}`); }
     catch { /* A escolha feita no painel continua disponível nesta aba. */ }
   }
 
-  function sincronizarBola(bola, treinador) {
-    const opcao = document.querySelector(`[data-custom-select-owner="ball-select"] button[data-value="${bola}"]`);
+  function sincronizarItem(tipo, seletorItem, id, treinador) {
+    const opcao = document.querySelector(`[data-custom-select-owner="${seletorItem}"] button[data-value="${id}"]`);
     const quantidade = opcao?.querySelector(".custom-select-quantity")?.textContent.trim();
     const estoque = /^(?:\d+|\d{1,3}(?:\.\d{3})+)$/.test(quantidade ?? "")
       ? Number(quantidade.replaceAll(".", "")) : NaN;
-    if (!Number.isSafeInteger(estoque)) return "aguardando-estoque";
-    if (estoque === 0) return "sem-bolas";
-    const controle = document.querySelector("#ball-select .custom-select-trigger:not(:disabled)");
+    if (!Number.isSafeInteger(estoque)) return "estoque";
+    if (estoque === 0) return "vazio";
+    const controle = document.querySelector(`#${seletorItem} .custom-select-trigger:not(:disabled)`);
     if (!controle || document.hidden || controle.getAttribute("aria-expanded") === "true" ||
-        document.querySelector("#game-shell[inert], #connection-screen:not([hidden]), body.pvp-mode")) {
-      return "aguardando-bola";
+        document.querySelector("#game-shell[inert], #connection-screen:not([hidden]), #starter-overlay:not([hidden]), " +
+          "#drawer.open, dialog[open], body.pvp-mode")) {
+      return "selecao";
     }
 
-    if (selecaoPendente && (selecaoPendente.bola !== bola || selecaoPendente.treinador !== treinador)) {
+    let selecaoPendente = selecoesPendentes.get(tipo);
+    if (selecaoPendente && (selecaoPendente.id !== id || selecaoPendente.treinador !== treinador)) {
+      selecoesPendentes.delete(tipo);
       selecaoPendente = null;
     }
     const selecionada = opcao.getAttribute("aria-selected") === "true";
-    // O clique altera o seletor localmente. A captura usa a seleção da próxima atualização do jogo.
+    // O clique altera o seletor localmente. Aguarda a próxima atualização do jogo.
     if (selecionada && (!selecaoPendente || controle.firstChild !== selecaoPendente.conteudo)) {
-      selecaoPendente = null;
-      return "ativa";
+      selecoesPendentes.delete(tipo);
+      return "pronta";
     }
     if (!selecionada && !opcao.disabled && performance.now() >= (selecaoPendente?.tentarApos ?? 0)) {
       opcao.click();
-      selecaoPendente = { bola, treinador, conteudo: controle.firstChild, tentarApos: performance.now() + INTERVALO_SELECAO };
+      selecoesPendentes.set(tipo, { id, treinador, conteudo: controle.firstChild, tentarApos: performance.now() + INTERVALO_SELECAO });
     }
-    return "aguardando-bola";
+    return "selecao";
   }
 
   function parar() {

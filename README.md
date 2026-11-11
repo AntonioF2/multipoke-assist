@@ -2,7 +2,7 @@
 
 Extensão para o Chrome que automatiza capturas no MultiPoke Idle. O painel **Auto Loja** também repõe suprimentos, vende loot e Pokémon, compara hunts e troca de área automaticamente.
 
-**Versão 1.5.24**
+**Versão 1.5.25**
 
 ## Instalar ou atualizar
 
@@ -29,7 +29,7 @@ Use a seta para expandir ou recolher o painel. Arraste pela faixa vermelha para 
 2. Em **Até**, defina o estoque que dispara a compra. Em **Comprar**, informe a quantidade por pedido. Por exemplo, **Até 10** e **Comprar 50** repõem 50 unidades quando restarem 10 ou menos.
 3. Defina a **Reserva de Pokédollars** e clique em **Iniciar Auto Loja**. A compra exige saldo para o lote inteiro e para a reserva.
 
-No campo **Revive**, escolha **Revive** ou **Max Revive**. Com a Auto Loja ativa, a extensão seleciona esse mesmo item para uso automático no Auto Helper. A reposição de revive também funciona fora da hunt. Ao pausar a Auto Loja, o Auto Helper continua com a última seleção. [Guia do Auto Helper](https://multipoke.io/pokepedia/guias/auto-helper)
+A Poké Bola, a poção e o revive escolhidos para reposição também são selecionados para uso no Auto Helper enquanto a Autocaptura ou a reposição correspondente estiver ativa. Ao receber estoque, a extensão volta a selecionar o item configurado, inclusive depois de uma troca automática do jogo para um item inferior. Escolha **Sem reposição** para controlar o tipo daquele suprimento pelo próprio jogo. O limiar de HP para usar poções segue a configuração do Auto Helper. A reposição de revive também funciona fora da hunt. [Guia do Auto Helper](https://multipoke.io/pokepedia/guias/auto-helper)
 
 ### Vender loot
 

@@ -212,6 +212,7 @@
         <div><label>Revive <select id="revive"><option value="">Sem reposição</option></select></label>
           <br><label>Até <input id="revive-min" type="number" min="0" max="10000" value="2"></label>
           <label>Comprar <input id="revive-qtd" type="number" min="1" max="10000" value="5"></label></div>
+        <p><small>Os suprimentos escolhidos para reposição também são selecionados para uso no Auto Helper.</small></p>
         <div><label>Reserva de Pokédollars <input id="reserva" type="number" min="0" max="999999999" value="200"></label></div>
         <div><label>Venda automática <select id="modo-venda">
             <option value="">Desligada</option>
@@ -362,9 +363,11 @@
   const chaveCompra = id => `multipoke.auto-loja.compra.${treinadorConfigurado}.${id}`;
   const chavePokemon = id => `multipoke.auto-loja.pokemon.${treinadorConfigurado}.${id}`;
 
-  function publicarBolaReposicao() {
+  function publicarReposicao() {
     raiz.dataset.multipokeTreinadorReposicao = treinadorConfigurado;
-    raiz.dataset.multipokeBolaReposicao = escolhasCompra.get("bola");
+    for (const tipo of tiposCompra) {
+      raiz.setAttribute(`data-multipoke-${tipo}-reposicao`, escolhasCompra.get(tipo) ?? "");
+    }
   }
 
   function carregarCompras() {
@@ -381,7 +384,7 @@
         if (!controle.value || !controle.validity.valid) controle.value = controle.defaultValue;
       }
     }
-    publicarBolaReposicao();
+    publicarReposicao();
   }
 
   function carregarRegras() {
@@ -426,12 +429,6 @@
   function produtoPorId(id) {
     const linha = loja().querySelector(`[data-shop-row="${CSS.escape(id)}"]`);
     return linha && produto(linha);
-  }
-
-  function opcaoRevive(regra) {
-    if (!regra || !jogo('#revive-select .custom-select-trigger:not(:disabled)[aria-expanded="false"]')) return;
-    const id = regra.id.split(":")[1];
-    return jogo(`[data-custom-select-owner="revive-select"] button[data-value="${id}"][aria-selected="false"]:not(:disabled)`);
   }
 
   function mostrarEstoque() {
@@ -903,9 +900,11 @@
 
   function definirSessao(configuracao) {
     sessao = configuracao && { ...configuracao, proximas: new Map(), avisos: new Map() };
-    const bola = sessao?.compras.find(regra => regra.tipo === "bola");
-    raiz.dataset.multipokeTreinadorReposicaoAtiva = bola ? sessao.treinador : "";
-    raiz.dataset.multipokeBolaReposicaoAtiva = bola?.id ?? "";
+    raiz.dataset.multipokeTreinadorReposicaoAtiva = sessao?.compras.length ? sessao.treinador : "";
+    for (const tipo of tiposCompra) {
+      const regra = sessao?.compras.find(regra => regra.tipo === tipo);
+      raiz.setAttribute(`data-multipoke-${tipo}-reposicao-ativa`, regra?.id ?? "");
+    }
     try {
       if (configuracao) sessionStorage.setItem(chaveSessao, JSON.stringify(configuracao));
       else sessionStorage.removeItem(chaveSessao);
@@ -993,7 +992,7 @@
     const lootDevido = modoVenda && catalogo && devida("loot");
     const pokemonDevido = podeVenderPokemon && devida("pokemon");
     const precisaAbrirLoja = comprasDevidas.length || lootDevido || pokemonDevido;
-    if (!precisaAbrirLoja && !opcaoRevive(revive)) {
+    if (!precisaAbrirLoja) {
       if (modoVenda && !catalogo) informar("Aguardando o catálogo de loot.");
       return;
     }
@@ -1001,8 +1000,6 @@
     try {
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
         if (!lock || !continua() || modal() || jogo("#drawer.open")) return;
-        opcaoRevive(revive)?.click();
-        if (!precisaAbrirLoja) return;
         await comLoja(false, async () => {
           for (const regra of comprasDevidas) {
             if (!continua() || !loja() || modal()) return;
@@ -1022,7 +1019,6 @@
             estoqueLido = true;
           }
         });
-        if (revive && continua() && !modal() && !jogo("#drawer.open")) opcaoRevive(revive)?.click();
       });
       if (sessao === atual) informar([...atual.avisos.values()].join(" · ") ||
         (modoVenda && !catalogo ? "Aguardando o catálogo de loot." : "Aguardando reposição ou itens elegíveis para venda."));
@@ -1056,7 +1052,7 @@
           campo(`${tipo}-min`).value = minimo;
           campo(`${tipo}-qtd`).value = qtd;
         }
-        publicarBolaReposicao();
+        publicarReposicao();
         campo("reserva").value = config.reserva;
         if (config.filtroPokemon) {
           campo("pokemon-qualidade").value = String(config.filtroPokemon.qualidade ?? "").replace(".", ",");
@@ -1106,7 +1102,7 @@
       if (!treinadorConfigurado || treinador() !== treinadorConfigurado) return;
       if (seletor) escolhasCompra.set(id, controle.value);
       else if (!controle.value || !controle.validity.valid) return;
-      if (id === "bola") publicarBolaReposicao();
+      if (seletor) publicarReposicao();
       try { localStorage.setItem(chaveCompra(id), controle.value); }
       catch { /* A configuração continua disponível nesta aba. */ }
     });
