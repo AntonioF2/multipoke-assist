@@ -10,14 +10,17 @@ function pedidoHunts(pedido) {
 
 function abrirBancoHunts() {
   bancoHunts ??= (() => {
-    const pedido = indexedDB.open("multipoke-hunts", 1);
+    const pedido = indexedDB.open("multipoke-hunts", 2);
     pedido.onupgradeneeded = () => {
       const banco = pedido.result;
-      banco.createObjectStore("catalogo", { keyPath: "chave" });
-      banco.createObjectStore("medicoes", { keyPath: ["equipe", "contexto", "area"] })
-        .createIndex("equipe-contexto", ["equipe", "contexto"]);
-      banco.createObjectStore("recordes", { keyPath: ["equipe", "area"] })
-        .createIndex("equipe", "equipe");
+      if (!banco.objectStoreNames.contains("catalogo")) {
+        banco.createObjectStore("catalogo", { keyPath: "chave" });
+        banco.createObjectStore("medicoes", { keyPath: ["equipe", "contexto", "area"] })
+          .createIndex("equipe-contexto", ["equipe", "contexto"]);
+        banco.createObjectStore("recordes", { keyPath: ["equipe", "area"] })
+          .createIndex("equipe", "equipe");
+      }
+      pedido.transaction.objectStore("medicoes").createIndex("equipe", "equipe");
     };
     return pedidoHunts(pedido).then(banco => {
       banco.onversionchange = () => {
@@ -134,15 +137,25 @@ async function salvarAmostrasHunts(amostras) {
   });
 }
 
-function lerHistoricoHunts(equipe, contexto) {
+function lerHistoricoHunts(equipe) {
+  if (typeof equipe !== "string" || !equipe || equipe.length > 8192) throw new Error("Equipe inválida.");
   return transacaoHunts(["medicoes", "recordes"], "readonly", async transacao => {
     const [registros, recordes] = await Promise.all([
-      contexto ? pedidoHunts(transacao.objectStore("medicoes").index("equipe-contexto").getAll([equipe, contexto])) : [],
+      pedidoHunts(transacao.objectStore("medicoes").index("equipe").getAll(equipe)),
       pedidoHunts(transacao.objectStore("recordes").index("equipe").getAll(equipe)),
     ]);
-    const rendimentos = registros.map(({ area, recentes }) => ({
-      area, hunt: recentes[0].hunt, ...taxasHunts(recentes),
-    }));
+    // Reúne também os contextos antigos, sem regravar nem excluir seus backups.
+    const areas = new Map();
+    for (const { area, recentes } of registros) {
+      if (!areas.has(area)) areas.set(area, new Map());
+      for (const amostra of recentes) {
+        if (!amostra.legado) areas.get(area).set(amostra.id, amostra);
+      }
+    }
+    const rendimentos = [...areas].flatMap(([area, amostras]) => {
+      const recentes = [...amostras.values()].sort((a, b) => b.data - a.data).slice(0, LIMITE_AMOSTRAS_HUNTS);
+      return recentes.length ? [{ area, hunt: recentes[0].hunt, ...taxasHunts(recentes) }] : [];
+    });
     return { recordes, rendimentos };
   });
 }
@@ -178,7 +191,7 @@ chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
           .put({ chave, valor, expira: Date.now() + horas * 3600_000 })));
         return true;
       }
-      case "historico": return lerHistoricoHunts(mensagem.equipe, mensagem.contexto);
+      case "historico": return lerHistoricoHunts(mensagem.equipe);
       case "salvar": return salvarAmostrasHunts(mensagem.amostras);
       case "exportar": return exportarHistoricoHunts();
       default: throw new Error("Operação de hunts desconhecida.");

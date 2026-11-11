@@ -412,31 +412,28 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     if (Number.isSafeInteger(xp) && Number.isSafeInteger(drops)) return { xp, drops };
   }
 
-  function contextoMedicao(equipe, golpesAtivos, bonusAtivos) {
-    if (!equipe || !golpesAtivos.every(Boolean)) return "";
-    const { vip, bonus, eventos, tipoDia, fatorDia } = bonusAtivos;
-    const contexto = [equipe.membros.map(membro => membro.nivel), golpesAtivos, vip, bonus, eventos, tipoDia];
-    // Mantém as medições do calendário padrão e separa dias com outro bônus de XP.
-    if (tipoDia && fatorDia !== 1.2) contexto.push(fatorDia);
-    return JSON.stringify(contexto);
+  function contextoMedicao(equipe) {
+    // A identidade da equipe já contém o treinador e os Pokémon equipados.
+    // Níveis, golpes e bônus alteram os ganhos, mas não separam o histórico.
+    return equipe ? JSON.stringify(["equipe", 1]) : "";
   }
 
   function lerEstado() {
     const equipe = equipeAtual();
     const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
     const bonus = lerBonusHunts();
-    return { equipe, golpesAtivos, bonus, cacada: lerCacada(), contexto: contextoMedicao(equipe, golpesAtivos, bonus) };
+    return { equipe, golpesAtivos, bonus, cacada: lerCacada(), contexto: contextoMedicao(equipe) };
   }
 
-  function consultarHistorico(equipe, contexto) {
-    const chave = JSON.stringify([equipe, contexto]);
+  function consultarHistorico(equipe) {
+    const chave = equipe;
     if (consultaHistorico?.chave === chave && Date.now() < consultaHistorico.expira) return consultaHistorico.dados;
     const atual = {
       chave, expira: Date.now() + 30_000,
       dados: consultaHistorico?.chave === chave ? consultaHistorico.dados : undefined,
     };
     consultaHistorico = atual;
-    void historico.ler(equipe, contexto).then(dados => { atual.dados = dados; }).catch(() => {
+    void historico.ler(equipe).then(dados => { atual.dados = dados; }).catch(() => {
       atual.dados = { recordes: [], rendimentos: [], indisponivel: true };
     });
     return atual.dados;
@@ -458,7 +455,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
       const segundos = amostra.segundos - base.segundos;
       const abates = amostra.abates - base.abates;
       if (segundos < MINIMO_SEGUNDOS) {
-        return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min.`;
+        return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min pelo Registro da Caçada.`;
       }
       atual.pendente = { amostra, medicao: {
         equipe: atual.chave, contexto, area: cacada.slug, hunt: cacada.hunt,
@@ -491,12 +488,12 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     mostrar("hunt-atual", cacada
       ? `${cacada.hunt}${Number.isFinite(xpOficial) ? ` · ${formatar(xpOficial)} XP/h na sessão` : ""}`
       : "Entre em uma hunt para iniciar a medição.");
-    const origem = rendimentos.length ? "mesma configuração" : "recorde histórico";
+    const origem = rendimentos.length ? "mesma equipe" : "recorde histórico";
     mostrar("hunt-melhor-xp", xp ? `${xp.hunt} · ${formatar(xp.xp)} XP/h · ${origem}` : "Aguardando medição");
     mostrar("hunt-melhor-drops", drops ? `${drops.hunt} · ${formatar(drops.drops)} Pokédollars/h · ${origem}` : "Aguardando medição");
     const recentes = recordes.map(item => item.ultima).sort((a, b) => b.data - a.data).slice(0, 100);
     mostrar("hunt-historico", recentes.length
-      ? recentes.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min${item.legado ? " · histórico anterior" : ""}${item.variouContexto ? " · níveis ou bônus variaram" : ""}`).join("\n")
+      ? recentes.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min${item.legado ? " · histórico anterior" : ""}${item.variouContexto ? " · janela anterior com variação de configuração" : ""}`).join("\n")
       : dados?.indisponivel ? "Histórico indisponível. Tentando reconectar ao banco local."
         : equipe && !dados ? "Carregando histórico..." : "Ainda sem hunts medidas com esta formação.");
   }
@@ -515,7 +512,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     if (trocaAtiva && !testesAtivos) void trocaHunts.atualizar(cacada, () => lerCacada()?.slug === cacada?.slug);
     acompanhar(equipe, cacada);
     if (mostraAnalise) {
-      const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
+      const historicoAtual = equipe && consultarHistorico(equipe.chave);
       apresentar(equipe, cacada, historicoAtual);
       const referencia = historicoAtual?.rendimentos.find(item => item.area === cacada?.slug);
       recomendar(equipe, golpesAtivos, referencia, bonus);
@@ -525,7 +522,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
       return reiniciarJanela();
     }
     const atual = sessao;
-    if (!atual || !cacada.slug || !contextoAtual) return mostrar("hunt-medicao", "Aguardando uma caçada e a leitura dos golpes da equipe.");
+    if (!atual || !cacada.slug || !contextoAtual) return mostrar("hunt-medicao", "Aguardando uma caçada e a leitura da equipe.");
     if (atual.contexto !== contextoAtual) {
       atual.contexto = contextoAtual;
       atual.base = null;

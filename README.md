@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.32**
+**Versão 1.5.33**
 
 ## Instalar ou atualizar
 
@@ -60,17 +60,19 @@ A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segund
 - **Análise de hunts** compara até 12 áreas regulares por XP e drops por abate. A estimativa considera o nível, os golpes da equipe, os encontros e os bônus de XP ativos. Com uma medição recente compatível, também estima o rendimento por hora.
 - A aba **Grind** escolhe a favorita acessível de maior nível no menu **Caçada**. Se nenhuma favorita estiver disponível, escolhe a área acessível de maior nível. Em empate de nível e preferência, mantém a hunt atual. A troca aguarda o primeiro minuto da caçada, exige a aba em foco e respeita cinco minutos entre tentativas de entrada.
 
-Com a análise aberta, a troca automática ou os testes ativos, a extensão registra medições em janelas de pelo menos cinco minutos com a mesma formação. O histórico guarda as dez amostras mais recentes por hunt e configuração, além dos recordes. Em **Histórico da mesma equipe**, use **Exportar backup** ou **Importar backup** para guardar ou mesclar os dados em JSON.
+Com a análise aberta, a troca automática ou os testes ativos, a extensão registra medições em janelas de pelo menos cinco minutos com a mesma formação. A duração vem da diferença entre as leituras do relógio do **Registro da Caçada**, sem um cronômetro próprio de coleta. O histórico e a média das dez amostras mais recentes são consultados por treinador, Pokémon do time e hunt, sem separar por nível, golpes ou bônus. Subir de nível mantém a janela em andamento e as medições anteriores. Os ganhos reais continuam incluindo os boosts e bônus recebidos. Os níveis e golpes ainda entram nas estimativas teóricas de combate.
+
+As medições e os recordes ficam no **IndexedDB da extensão**, sem prazo de expiração, e permanecem ao fechar e reabrir o navegador no mesmo perfil. Atualizações da extensão preservam o banco. Registros anteriores separados por nível ou configuração são reaproveitados automaticamente na média do time, sem apagar os dados originais. Em **Histórico da mesma equipe**, use **Exportar backup** ou **Importar backup** para guardar ou mesclar os dados em JSON. Desinstalar a extensão, excluir o perfil ou limpar os dados da extensão pode remover esse histórico; o backup permite recuperá-lo.
 
 ### Testes reais nas hunts
 
-Na aba **Hunts**, clique em **Iniciar testes nas hunts** durante uma caçada regular. O Assist consulta todas as áreas regulares acessíveis no menu **Caçada** e testa as que ainda precisam de uma medição compatível com a configuração atual. Marque **Incluir hunts já medidas** para repetir a avaliação. A fila é definida ao iniciar a rodada.
+Na aba **Hunts**, clique em **Iniciar testes nas hunts** durante uma caçada regular. O Assist consulta todas as áreas regulares acessíveis no menu **Caçada** e testa as que ainda precisam de uma medição para o time atual. Marque **Incluir hunts já medidas** para repetir a avaliação. A fila é definida ao iniciar a rodada.
 
-Cada hunt recebe uma janela de pelo menos **cinco minutos de coleta**, após até **um minuto de adaptação** à entrada. São medidos XP, valor dos drops e abates do Registro da Caçada, incluindo o tempo de caminhada, combate e espera por respawn. A aba mostra os totais observados e as projeções por hora. As medições ficam no IndexedDB e alimentam o histórico e as estimativas compatíveis. Os melhores ganhos medidos priorizam as médias da mesma configuração; recordes históricos aparecem identificados quando faltam medições compatíveis. Janelas sem abates registram rendimento zero. [Ritmo e respawn das hunts](https://multipoke.io/pokepedia/guias/progressao)
+Cada hunt recebe uma janela de pelo menos **cinco minutos de coleta pelo relógio do Registro da Caçada**, após até **um minuto de adaptação** à entrada. São medidos XP, valor dos drops e abates do Registro da Caçada, incluindo o tempo de caminhada, combate e espera por respawn. A aba mostra o tempo do jogo, os totais observados e as projeções por hora. As medições ficam no IndexedDB e alimentam o histórico e as estimativas do time. Os melhores ganhos medidos priorizam as médias da mesma equipe; recordes históricos aparecem identificados quando faltam amostras de totais reais. Janelas sem abates registram rendimento zero. [Ritmo e respawn das hunts](https://multipoke.io/pokepedia/guias/progressao)
 
 Mantenha a aba em foco e o jogo livre. Perder o foco ou ficar mais de 45 segundos sem leitura reinicia a janela em andamento. A reposição e as vendas podem continuar entre as leituras, enquanto a troca automática aguarda a rodada. Ao concluir, o Assist retorna à hunt de origem e libera a troca automática. **Parar testes** encerra as próximas ações e conserva as medições já salvas.
 
-Alterar treinador, integrantes ou golpes encerra a rodada. Subidas de nível e mudanças de bônus são identificadas nas janelas e exibidas nos resultados e no histórico. Essas janelas ficam separadas das medições de configuração constante. Os testes não retomam automaticamente após recarregar a página.
+Alterar treinador ou integrantes encerra a rodada. Subidas de nível, mudanças de golpes e bônus mantêm as medições associadas ao mesmo time. Os testes não retomam automaticamente após recarregar a página; as medições já concluídas permanecem salvas.
 
 ## Tierlist de Pokémon
 

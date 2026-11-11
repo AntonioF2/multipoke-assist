@@ -396,7 +396,7 @@
         <p id="hunt-atual"></p>
         <section class="bloco-config hunt-testes" aria-labelledby="hunt-testes-titulo">
           <h3 id="hunt-testes-titulo">Teste real das hunts</h3>
-          <p>Cinco minutos de coleta em cada hunt acessível, após até um minuto de adaptação de entrada.</p>
+          <p>Cinco minutos pelo relógio do Registro da Caçada em cada hunt acessível, após até um minuto de adaptação de entrada.</p>
           <label class="opcao-check"><input id="hunt-testar-repetir" type="checkbox"><span>Incluir hunts já medidas</span></label>
           <button id="hunt-testar" type="button">Iniciar testes nas hunts</button>
           <progress id="hunt-teste-progresso" max="1" value="0" aria-label="Progresso dos testes de hunts"></progress>
@@ -429,7 +429,7 @@
           <input id="hunt-arquivo" type="file" accept=".json,application/json" hidden>
           <p id="hunt-backup-status" role="status"></p>
         </details>
-        <p><small>As medições usam janelas de pelo menos 5 minutos com a análise aberta, a troca automática ou os testes ativos. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
+        <p><small>Tempo medido pelo Registro da Caçada. O histórico pertence ao time e permanece salvo ao fechar o navegador; subir de nível não reinicia a coleta. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
         <p>Escolhe a favorita disponível de maior nível. Se nenhuma favorita estiver disponível, escolhe a hunt disponível de maior nível.</p>

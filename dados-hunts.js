@@ -46,9 +46,9 @@ function criarAcessoHistoricoHunts(campo, aoAlterar) {
 
   const pronto = () => migracao ??= navigator.locks.request("multipoke-migracao-hunts", migrar)
     .catch(erro => { migracao = undefined; throw erro; });
-  const ler = async (equipe, contexto) => {
+  const ler = async equipe => {
     await pronto();
-    return enviarDadosHunts("historico", { equipe, contexto });
+    return enviarDadosHunts("historico", { equipe });
   };
   const salvar = async amostra => {
     await pronto();
