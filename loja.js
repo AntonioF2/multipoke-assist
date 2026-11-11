@@ -245,12 +245,12 @@
       #tierlist-lista { display: grid; gap: 12px; }
       .tier-grupo { border: 1px solid var(--borda); border-top: 3px solid var(--rank-cor);
         border-radius: 11px; background: #fff; overflow: hidden; }
-      .tier-grupo[data-rank="SS"] { --rank-cor: #7951aa; --rank-fundo: #f1eafa; }
-      .tier-grupo[data-rank="S"] { --rank-cor: #97701c; --rank-fundo: #fff4d7; }
-      .tier-grupo[data-rank="A"] { --rank-cor: #ae4857; --rank-fundo: #fff0f1; }
-      .tier-grupo[data-rank="B"] { --rank-cor: #426fa6; --rank-fundo: #edf3fc; }
-      .tier-grupo[data-rank="C"] { --rank-cor: #317e75; --rank-fundo: #eaf6f3; }
-      .tier-grupo[data-rank="D"] { --rank-cor: #68778d; --rank-fundo: #f1f4f8; }
+      .tier-grupo[data-rank="SS"], .tier-equipe[data-rank="SS"], .tier-membro[data-rank="SS"] { --rank-cor: #7951aa; --rank-fundo: #f1eafa; }
+      .tier-grupo[data-rank="S"], .tier-equipe[data-rank="S"], .tier-membro[data-rank="S"] { --rank-cor: #97701c; --rank-fundo: #fff4d7; }
+      .tier-grupo[data-rank="A"], .tier-equipe[data-rank="A"], .tier-membro[data-rank="A"] { --rank-cor: #ae4857; --rank-fundo: #fff0f1; }
+      .tier-grupo[data-rank="B"], .tier-equipe[data-rank="B"], .tier-membro[data-rank="B"] { --rank-cor: #426fa6; --rank-fundo: #edf3fc; }
+      .tier-grupo[data-rank="C"], .tier-equipe[data-rank="C"], .tier-membro[data-rank="C"] { --rank-cor: #317e75; --rank-fundo: #eaf6f3; }
+      .tier-grupo[data-rank="D"], .tier-equipe[data-rank="D"], .tier-membro[data-rank="D"] { --rank-cor: #68778d; --rank-fundo: #f1f4f8; }
       .tier-cabecalho { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
         border-bottom: 1px solid var(--borda); }
       .tier-selo { display: grid; place-items: center; width: 36px; height: 36px;
@@ -270,6 +270,21 @@
       .tier-nome { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         font-size: 10px; font-weight: 550; }
       .tier-vazio { margin: 0; padding: 0 12px 12px; font-size: 11px; color: var(--muted); }
+      .tier-equipe { --rank-cor: #68778d; --rank-fundo: #f1f4f8; margin-top: 12px; padding: 12px;
+        background: #fff; border: 1px solid var(--borda); border-left: 3px solid var(--rank-cor); border-radius: 11px; }
+      .tier-equipe-cabecalho { display: flex; align-items: center; gap: 10px; }
+      .tier-equipe-cabecalho h4 { margin: 0; font-size: 13px; }
+      .tier-equipe-cabecalho .tier-selo { flex: 0 0 42px; width: 42px; height: 42px; font-size: 20px; }
+      #tierlist-equipe-status { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+      #tierlist-equipe-membros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+      #tierlist-equipe-membros:empty { display: none; }
+      .tier-membro { --rank-cor: #68778d; --rank-fundo: #f1f4f8; min-height: 96px; justify-content: center; }
+      .tier-membro .tier-nome { font-size: 11px; }
+      .tier-membro-rank { max-width: 100%; padding: 1px 7px; border-radius: 5px; font-size: 10px; font-weight: 700; text-align: center;
+        color: var(--rank-cor); background: var(--rank-fundo); }
+      .tier-metodo { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--borda); font-size: 11px; color: var(--muted); }
+      .tier-metodo > summary { font-weight: 600; }
+      .tier-metodo p { margin: 7px 0 0; line-height: 1.6; }
       @media (max-width: 480px) {
         .linha-reposicao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .linha-reposicao > .campo:first-child { grid-column: 1 / -1; }
@@ -399,6 +414,19 @@
           <p>Explore os ranks e clique em um Pokémon para abrir sua ficha.</p>
           <a href="https://multipoke.io/pokepedia/guias/ranks" target="_blank" rel="noopener noreferrer">Como funcionam os ranks ↗</a>
         </div>
+        <section id="tierlist-equipe" class="tier-equipe" aria-labelledby="tierlist-equipe-titulo">
+          <div class="tier-equipe-cabecalho">
+            <span id="tierlist-equipe-rank" class="tier-selo" aria-hidden="true">—</span>
+            <div><h4 id="tierlist-equipe-titulo">Rank médio do time atual</h4>
+              <p id="tierlist-equipe-status" role="status">Aguardando a equipe do treinador.</p></div>
+          </div>
+          <div id="tierlist-equipe-membros"></div>
+          <details class="tier-metodo">
+            <summary>Como calculamos o rank do time</summary>
+            <p>D = 1, C = 2, B = 3, A = 4, S = 5 e SS = 6. Cada Pokémon da equipe tem o mesmo peso.
+              A média é arredondada para o rank mais próximo, com 0,5 para cima. Cálculo da extensão com base nos ranks das espécies.</p>
+          </details>
+        </section>
         <input id="tierlist-busca" type="search" placeholder="Nome ou número na Pokédex" aria-label="Buscar Pokémon por nome ou número" autocomplete="off">
         <div id="tierlist-ranks" role="group" aria-label="Filtrar Pokémon por rank"></div>
         <p id="tierlist-status" role="status">Abra esta aba para consultar os ranks.</p>

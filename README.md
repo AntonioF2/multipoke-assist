@@ -2,7 +2,7 @@
 
 Extensão para o Chrome que automatiza capturas no MultiPoke Idle. O painel **Auto Loja** também repõe suprimentos, vende loot e Pokémon, compara hunts e troca de área automaticamente.
 
-**Versão 1.5.27**
+**Versão 1.5.28**
 
 ## Instalar ou atualizar
 
@@ -59,6 +59,8 @@ Com a análise aberta ou a troca automática ativa, a extensão registra mediç�
 A aba **Tierlist** agrupa todas as espécies do catálogo da Pokepédia por rank, de **SS** a **D**. Escolha um rank ou use a busca por nome ou número para encontrar um Pokémon e clique no seu ícone para abrir a ficha em outra aba. Os ranks seguem a classificação de cada espécie publicada pelo jogo. [Guia de ranks](https://multipoke.io/pokepedia/guias/ranks)
 
 O catálogo é carregado ao abrir a aba e reaproveitado no IndexedDB. As imagens são carregadas conforme os Pokémon entram na área visível.
+
+No topo, **Rank médio do time atual** mostra os Pokémon equipados e seus ranks individuais. A extensão atribui D = 1, C = 2, B = 3, A = 4, S = 5 e SS = 6, calcula a média com o mesmo peso para cada integrante e arredonda ao rank mais próximo, com 0,5 para cima. Por exemplo, S + A + B resulta em A. A composição é conferida a cada dois segundos enquanto a Tierlist está aberta. O resultado aguarda a identificação de todos os integrantes e usa os ranks das espécies, incluindo os Pokémon desmaiados que continuam na equipe.
 
 ## Privacidade e créditos
 

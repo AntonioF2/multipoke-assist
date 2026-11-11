@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MultiPoke Autocaptura",
-  "version": "1.5.27",
+  "version": "1.5.28",
   "description": "Inicia a autocaptura e carrega o painel Auto Loja ao abrir o MultiPoke Idle.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApnvGZsZhu3tDWEk8PRRj0bN5PJ+Xfxpa5Mi1svJIc8c+MNcCz8TM7dSieFOnnroLm0upYdCUJ7/pQW6XU2RkKwtP+NpnsZ5mp+S8UPlY4+sCAWiL+qn4DuP/LYH1xQ8NnlJCfhQokmfySNGAxjraHGiGveQ+0T9DxYU4Pzp0TR3HVe7Zzpc9pO8mGKvghn+yPTm0/gcRdCH6Jz6D64Q4Bwxu4U3dO14nghfcPxIngi/vw32wFHXz0kwQNd8wRTjVzBEtYuDFDXaHeuLaWbNGvjroCjHKdRo2uQG1dvHsy7HOdw1lImdT9eSVj78OL+jaS5+TU8fwTebqJ59B3FqcpQIDAQAB",
   "permissions": ["scripting"],

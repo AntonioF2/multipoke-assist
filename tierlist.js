@@ -1,11 +1,17 @@
 function criarTierlist(campo, { normalizar }) {
-  const ranks = ["SS", "S", "A", "B", "C", "D"];
+  const escala = ["D", "C", "B", "A", "S", "SS"];
+  const ranks = [...escala].reverse();
+  const decimais = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const chaveEspecie = nome => normalizar(nome.trim())
+    .replace(/^(?:(?:shiny|holo)\s+)+/, "").replace(/\s+\+\d+$/, "").replace(/[^a-z0-9♀♂]/g, "");
   const lista = campo("tierlist-lista");
   const status = campo("tierlist-status");
   const busca = campo("tierlist-busca");
   const filtros = campo("tierlist-ranks");
   const tentar = campo("tierlist-tentar");
   const grupos = new Map();
+  let especiesPorNome = new Map();
+  let ultimaEquipe;
   let itens = [];
   let carregando;
   let expira = 0;
@@ -79,6 +85,49 @@ function criarTierlist(campo, { normalizar }) {
     return { link, rank, busca: normalizar(`${nome} ${id} ${numero}`) };
   }
 
+  function atualizarEquipe() {
+    if (campo("aba-tierlist").hidden || !campo("painel").open) return;
+    const treinador = document.querySelector("#game-shell:not([inert]) #party-trainer-name")?.textContent.trim();
+    const membros = treinador ? [...document.querySelectorAll("#party-members [data-team-pokemon]")].map(linha => {
+      const rotulo = linha.querySelector(".member-label");
+      const nome = rotulo?.title || rotulo?.textContent.trim() || "Pokémon não identificado";
+      return { id: linha.dataset.teamPokemon, nome, especie: especiesPorNome.get(chaveEspecie(nome)) };
+    }) : [];
+    const chave = JSON.stringify([treinador, membros.map(({ id, nome, especie }) => [id, nome, especie?.id, especie?.rank])]);
+    if (chave === ultimaEquipe) return;
+    ultimaEquipe = chave;
+    const conhecidos = membros.filter(membro => membro.especie);
+    const completo = membros.length > 0 && conhecidos.length === membros.length;
+    const media = completo ? conhecidos.reduce((soma, membro) => soma + escala.indexOf(membro.especie.rank) + 1, 0) / membros.length : NaN;
+    const rank = completo ? escala[Math.round(media) - 1] : "";
+    campo("tierlist-equipe").dataset.rank = rank;
+    campo("tierlist-equipe-rank").textContent = rank || "—";
+    const resumo = campo("tierlist-equipe-status");
+    if (!treinador) resumo.textContent = "Aguardando a equipe do treinador.";
+    else if (!membros.length) resumo.textContent = "Adicione Pokémon à equipe para calcular o rank.";
+    else if (!completo) resumo.textContent = `Identificados ${conhecidos.length} de ${membros.length} Pokémon. Aguardando os ranks restantes.`;
+    else resumo.textContent = `Rank ${rank} · Média ${decimais.format(media)} de 6 · ${membros.length} Pokémon`;
+    const fragmento = document.createDocumentFragment();
+    for (const { nome, especie } of membros) {
+      const cartao = especie ? criarPokemon(especie).link : document.createElement("div");
+      cartao.classList.add("tier-pokemon", "tier-membro");
+      cartao.dataset.rank = especie?.rank ?? "";
+      if (!especie) {
+        const legenda = document.createElement("span");
+        legenda.className = "tier-nome";
+        legenda.textContent = nome;
+        cartao.append(legenda);
+      }
+      cartao.title = `${nome} · ${especie ? `Rank ${especie.rank}` : "Rank pendente"}`;
+      const selo = document.createElement("span");
+      selo.className = "tier-membro-rank";
+      selo.textContent = especie ? `Rank ${especie.rank}` : "Rank pendente";
+      cartao.append(selo);
+      fragmento.append(cartao);
+    }
+    campo("tierlist-equipe-membros").replaceChildren(fragmento);
+  }
+
   function filtrar() {
     const termo = normalizar(busca.value.trim());
     let total = 0;
@@ -102,6 +151,7 @@ function criarTierlist(campo, { normalizar }) {
     const fragmento = document.createDocumentFragment();
     grupos.clear();
     itens = especies.map(criarPokemon);
+    especiesPorNome = new Map(especies.map(especie => [chaveEspecie(especie.nome), especie]));
     for (const rank of ranks) {
       const secao = document.createElement("section");
       secao.className = "tier-grupo";
@@ -135,9 +185,11 @@ function criarTierlist(campo, { normalizar }) {
     }
     lista.replaceChildren(fragmento);
     filtrar();
+    atualizarEquipe();
   }
 
   async function atualizar() {
+    atualizarEquipe();
     if (carregando || (itens.length && Date.now() < expira)) return;
     status.textContent = "Consultando os ranks na Pokepédia...";
     tentar.hidden = true;
@@ -157,5 +209,6 @@ function criarTierlist(campo, { normalizar }) {
 
   busca.addEventListener("input", () => { if (itens.length) filtrar(); });
   tentar.addEventListener("click", () => void atualizar());
+  setInterval(atualizarEquipe, 2000);
   return atualizar;
 }
