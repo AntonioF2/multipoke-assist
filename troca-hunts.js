@@ -14,6 +14,7 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
   let proximaTroca = 0;
   let ultimaInteracao = -Infinity;
   let ocupada = false;
+  let testesReservados = false;
 
   for (const evento of ["pointerdown", "keydown"]) {
     document.addEventListener(evento, event => {
@@ -27,6 +28,7 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
   }
 
   botao.addEventListener("click", () => {
+    if (testesReservados) return;
     if (sessao) {
       definirSessao(null);
       informar("Troca automática pausada.");
@@ -59,15 +61,15 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
       if (cartao.closest("[data-safari-activity]")) continue;
       const slug = cartao.querySelector("[data-hunt-slug]")?.dataset.huntSlug;
       const nome = cartao.querySelector(".hunt-destination-name-copy")?.textContent.trim();
-      const nivel = cartao.querySelector(".hunt-destination-level")?.textContent.trim().match(/^LV\. (\d+)$/)?.[1];
+      const nivel = cartao.querySelector(".hunt-destination-level")?.textContent.trim().match(/^LV\. ([\d.]+)$/)?.[1];
       if (!slug || !nome || nivel === undefined) continue;
       const favorita = Boolean(cartao.querySelector('[data-hunt-favorite][aria-pressed="true"]'));
-      hunts.push({ slug, nome, nivel: Number(nivel), favorita, regiao });
+      hunts.push({ slug, nome, nivel: Number(nivel.replaceAll(".", "")), favorita, regiao });
     }
     return hunts;
   }
 
-  function procurarHunt(slugAtual) {
+  function comHuntsDisponiveis(executar) {
     const abrir = jogo("#nav-hunt:not(:disabled)");
     const fechar = jogo("#drawer-close:not(:disabled)");
     if (!abrir || !fechar) return;
@@ -118,24 +120,17 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
         selecionarRegiao(regiao);
         return lerHunts(regiao);
       });
-      hunts.sort((a, b) => Number(b.favorita) - Number(a.favorita) || b.nivel - a.nivel ||
-        Number(b.slug === slugAtual) - Number(a.slug === slugAtual));
-
-      for (const hunt of hunts) {
-        if (hunt.slug === slugAtual) {
-          informar(`Você já está em ${hunt.nome} (Lv. ${formatar(hunt.nivel)}), a hunt prioritária.`);
-          return;
-        }
+      return executar(hunts, hunt => {
         selecionarRegiao(hunt.regiao);
         const slug = CSS.escape(hunt.slug);
         const seletor = `#hunt-list button[data-hunt-enter="${slug}"]:not(:disabled):not([aria-disabled="true"])`;
         if (!jogo(seletor)) jogo(`#hunt-list button[data-hunt-slug="${slug}"]`)?.click();
         const entrar = menu() && jogo(seletor);
-        if (!entrar) continue;
+        if (!entrar) return false;
         entrar.click();
-        return hunt;
-      }
-      informar("Aguardando uma hunt regular disponível no menu Caçada.");
+        proximaTroca = Date.now() + INTERVALO_TROCA;
+        return true;
+      });
     } finally {
       for (const restaurarFiltro of restaurar.reverse()) restaurarFiltro();
       if (menu()) fechar.click();
@@ -143,7 +138,54 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
     }
   }
 
+  function procurarHunt(slugAtual) {
+    return comHuntsDisponiveis((hunts, entrar) => {
+      hunts.sort((a, b) => Number(b.favorita) - Number(a.favorita) || b.nivel - a.nivel ||
+        Number(b.slug === slugAtual) - Number(a.slug === slugAtual));
+      for (const hunt of hunts) {
+        if (hunt.slug === slugAtual) {
+          informar(`Você já está em ${hunt.nome} (Lv. ${formatar(hunt.nivel)}), a hunt prioritária.`);
+          return;
+        }
+        if (entrar(hunt)) return hunt;
+      }
+      informar("Aguardando uma hunt regular disponível no menu Caçada.");
+    });
+  }
+
+  function reservarTestes(ativa) {
+    if (ativa && (ocupada || pendente)) return false;
+    testesReservados = ativa;
+    botao.disabled = ativa;
+    informar(ativa ? "Navegação reservada para os testes de hunts."
+      : sessao ? "Troca automática retomada após os testes." : "Troca automática desligada.");
+    return true;
+  }
+
+  async function operarTeste(executar, confirmarContexto) {
+    if (!testesReservados || ocupada || pendente || !livre()) return;
+    ocupada = true;
+    try {
+      return await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, lock => {
+        if (lock && testesReservados && livre() && confirmarContexto()) return executar();
+      });
+    } finally { ocupada = false; }
+  }
+
+  function listarParaTeste(confirmarContexto) {
+    return operarTeste(() => comHuntsDisponiveis(hunts => hunts.map(({ regiao, ...hunt }) => hunt)), confirmarContexto);
+  }
+
+  function entrarParaTeste(slug, confirmarContexto) {
+    if (Date.now() < proximaTroca) return Promise.resolve({ estado: "intervalo" });
+    return operarTeste(() => comHuntsDisponiveis((hunts, entrar) => {
+      const hunt = hunts.find(hunt => hunt.slug === slug);
+      return { estado: hunt && entrar(hunt) ? "solicitada" : "indisponivel" };
+    }), confirmarContexto);
+  }
+
   async function atualizar(cacada, confirmarContexto) {
+    if (testesReservados) return;
     const nome = treinador();
     if (pendente) {
       if (nome === pendente.treinador && cacada?.slug === pendente.slug) {
@@ -168,14 +210,16 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
 
     ocupada = true;
     try {
-      await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, lock => {
-        if (!lock || sessao !== atual || treinador() !== nome || !livre() || !confirmarContexto()) return;
-        proximaConsulta = Date.now() + INTERVALO_CONSULTA;
-        const hunt = procurarHunt(cacada.slug);
-        if (!hunt) return;
-        proximaTroca = Date.now() + INTERVALO_TROCA;
-        pendente = { slug: hunt.slug, nome: hunt.nome, treinador: nome, vence: Date.now() + PRAZO_CONFIRMACAO };
-        informar(`Entrada solicitada em ${hunt.nome} (Lv. ${formatar(hunt.nivel)}${hunt.favorita ? ", favorita" : ""}). Aguardando confirmação do jogo.`);
+      await navigator.locks.request("multipoke-testes-hunts", { ifAvailable: true }, async reserva => {
+        if (!reserva) return informar("Aguardando os testes de hunts em execução em outra aba.");
+        await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, lock => {
+          if (!lock || sessao !== atual || treinador() !== nome || !livre() || !confirmarContexto()) return;
+          proximaConsulta = Date.now() + INTERVALO_CONSULTA;
+          const hunt = procurarHunt(cacada.slug);
+          if (!hunt) return;
+          pendente = { slug: hunt.slug, nome: hunt.nome, treinador: nome, vence: Date.now() + PRAZO_CONFIRMACAO };
+          informar(`Entrada solicitada em ${hunt.nome} (Lv. ${formatar(hunt.nivel)}${hunt.favorita ? ", favorita" : ""}). Aguardando confirmação do jogo.`);
+        });
       });
     } catch {
       proximaTroca = Date.now() + INTERVALO_TROCA;
@@ -188,6 +232,9 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
   return {
     ativa: () => Boolean(sessao || pendente),
     emTroca: () => Boolean(ocupada || pendente),
+    reservarTestes,
+    listarParaTeste,
+    entrarParaTeste,
     atualizar,
   };
 }

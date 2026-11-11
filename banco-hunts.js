@@ -62,13 +62,14 @@ function taxasHunts(amostras) {
 function resumoAmostraHunt(amostra) {
   const { hunt, data, segundos, legado } = amostra;
   const { xp, drops } = legado ? amostra : taxasHunts([amostra]);
-  return { hunt, data, segundos, legado, xp, drops };
+  return { hunt, data, segundos, legado, xp, drops, ...(amostra.variouContexto ? { variouContexto: true } : {}) };
 }
 
 function amostraValidaHunt(amostra) {
   const campos = ["equipe", "contexto", "area", "id", "hunt"];
   if (!amostra || campos.some(campo => typeof amostra[campo] !== "string" || amostra[campo].length > 8192) ||
-      !amostra.equipe || !amostra.area || !amostra.id || !amostra.hunt) return false;
+      !amostra.equipe || !amostra.area || !amostra.id || !amostra.hunt ||
+      (amostra.variouContexto !== undefined && typeof amostra.variouContexto !== "boolean")) return false;
   const { equipe, data, segundos, xp, drops, abates, legado, contexto, area } = amostra;
   try {
     const formacao = JSON.parse(equipe);
@@ -77,7 +78,7 @@ function amostraValidaHunt(amostra) {
   const numeros = [data, segundos, xp, drops];
   if (numeros.some(valor => !Number.isSafeInteger(valor) || valor < 0) || segundos < 300) return false;
   return legado === true ? contexto === "" : legado === false && Boolean(contexto) &&
-    /^[\w-]+$/.test(area) && Number.isSafeInteger(abates) && abates > 0 &&
+    /^[\w-]+$/.test(area) && Number.isSafeInteger(abates) && abates >= 0 &&
     Object.values(taxasHunts([amostra])).every(Number.isSafeInteger);
 }
 
@@ -111,9 +112,10 @@ async function salvarAmostrasHunts(amostras) {
       let ultima = recorde?.ultima;
       let xp = recorde?.xp;
       let drops = recorde?.drops;
-      for (const { id, hunt, data, segundos, legado, xp: xpAmostra, drops: dropsAmostra, abates } of grupo) {
+      for (const { id, hunt, data, segundos, legado, xp: xpAmostra, drops: dropsAmostra, abates, variouContexto } of grupo) {
         if (recentes.has(id) || melhorXp?.id === id || melhoresDrops?.id === id) continue;
-        const amostra = { id, hunt, data, segundos, legado, xp: xpAmostra, drops: dropsAmostra, abates };
+        const amostra = { id, hunt, data, segundos, legado, xp: xpAmostra, drops: dropsAmostra, abates,
+          ...(variouContexto ? { variouContexto: true } : {}) };
         recentes.set(id, amostra);
         const resumo = resumoAmostraHunt(amostra);
         if (!melhorXp || resumo.xp > resumoAmostraHunt(melhorXp).xp) melhorXp = amostra;

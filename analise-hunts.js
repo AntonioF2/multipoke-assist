@@ -317,6 +317,14 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
   let sessao;
   let consultaHistorico;
   const historico = criarAcessoHistoricoHunts(campo, () => { consultaHistorico = undefined; });
+  const testes = criarTestesHunts(campo, {
+    formatar, trocaHunts, historico, lerEstado,
+    lerTotais: () => {
+      const popup = document.getElementById("analyzer-insight");
+      return popup?.hidden ? lerTotais(popup) : undefined;
+    },
+    aoSolicitar: () => void atualizar(),
+  });
 
   const visivel = () => campo("painel").open && !campo("aba-hunts").hidden;
   const mostrar = (id, valor) => {
@@ -413,6 +421,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     return JSON.stringify(contexto);
   }
 
+  function lerEstado() {
+    const equipe = equipeAtual();
+    const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
+    const bonus = lerBonusHunts();
+    return { equipe, golpesAtivos, bonus, cacada: lerCacada(), contexto: contextoMedicao(equipe, golpesAtivos, bonus) };
+  }
+
   function consultarHistorico(equipe, contexto) {
     const chave = JSON.stringify([equipe, contexto]);
     if (consultaHistorico?.chave === chave && Date.now() < consultaHistorico.expira) return consultaHistorico.dados;
@@ -442,8 +457,8 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
 
       const segundos = amostra.segundos - base.segundos;
       const abates = amostra.abates - base.abates;
-      if (segundos < MINIMO_SEGUNDOS || abates <= 0) {
-        return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min e pelo menos um abate.`;
+      if (segundos < MINIMO_SEGUNDOS) {
+        return `Medindo esta equipe · ${Math.floor(segundos / 60)} de 5 min.`;
       }
       atual.pendente = { amostra, medicao: {
         equipe: atual.chave, contexto, area: cacada.slug, hunt: cacada.hunt,
@@ -461,8 +476,13 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
 
   function apresentar(equipe, cacada, dados) {
     const recordes = dados?.recordes ?? [];
-    const melhor = campo => recordes.reduce((primeiro, item) =>
-      !primeiro || item[campo][campo] > primeiro[campo] ? item[campo] : primeiro, null);
+    const rendimentos = dados?.rendimentos ?? [];
+    const melhor = campo => {
+      if (rendimentos.length) return rendimentos.reduce((primeiro, item) =>
+        !primeiro || item[campo] > primeiro[campo] ? item : primeiro, null);
+      return recordes.reduce((primeiro, item) =>
+        !primeiro || item[campo][campo] > primeiro[campo] ? item[campo] : primeiro, null);
+    };
     const xp = melhor("xp");
     const drops = melhor("drops");
     const xpOficial = numero(texto(document, "#xp-per-hour"));
@@ -471,11 +491,12 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     mostrar("hunt-atual", cacada
       ? `${cacada.hunt}${Number.isFinite(xpOficial) ? ` · ${formatar(xpOficial)} XP/h na sessão` : ""}`
       : "Entre em uma hunt para iniciar a medição.");
-    mostrar("hunt-melhor-xp", xp ? `${xp.hunt} · ${formatar(xp.xp)} XP/h` : "Aguardando medição");
-    mostrar("hunt-melhor-drops", drops ? `${drops.hunt} · ${formatar(drops.drops)} Pokédollars/h` : "Aguardando medição");
+    const origem = rendimentos.length ? "mesma configuração" : "recorde histórico";
+    mostrar("hunt-melhor-xp", xp ? `${xp.hunt} · ${formatar(xp.xp)} XP/h · ${origem}` : "Aguardando medição");
+    mostrar("hunt-melhor-drops", drops ? `${drops.hunt} · ${formatar(drops.drops)} Pokédollars/h · ${origem}` : "Aguardando medição");
     const recentes = recordes.map(item => item.ultima).sort((a, b) => b.data - a.data).slice(0, 100);
     mostrar("hunt-historico", recentes.length
-      ? recentes.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min${item.legado ? " · histórico anterior" : ""}`).join("\n")
+      ? recentes.map(item => `${item.hunt} · ${formatar(item.xp)} XP/h · ${formatar(item.drops)} Pokédollars/h · ${Math.floor(item.segundos / 60)} min${item.legado ? " · histórico anterior" : ""}${item.variouContexto ? " · níveis ou bônus variaram" : ""}`).join("\n")
       : dados?.indisponivel ? "Histórico indisponível. Tentando reconectar ao banco local."
         : equipe && !dados ? "Carregando histórico..." : "Ainda sem hunts medidas com esta formação.");
   }
@@ -487,19 +508,21 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
   async function atualizar() {
     const mostraAnalise = visivel();
     const trocaAtiva = trocaHunts.ativa();
-    if (!mostraAnalise && !trocaAtiva) return reiniciarJanela();
-    const cacada = lerCacada();
-    if (trocaAtiva) void trocaHunts.atualizar(cacada, () => lerCacada()?.slug === cacada?.slug);
-    const equipe = equipeAtual();
+    const testesAtivos = testes.ativa();
+    if (!mostraAnalise && !trocaAtiva && !testesAtivos) return reiniciarJanela();
+    const estado = lerEstado();
+    const { cacada, equipe, golpesAtivos, bonus, contexto: contextoAtual } = estado;
+    if (trocaAtiva && !testesAtivos) void trocaHunts.atualizar(cacada, () => lerCacada()?.slug === cacada?.slug);
     acompanhar(equipe, cacada);
-    const golpesAtivos = equipe ? lerGolpesHunts(equipe.membros) : [];
-    const bonus = lerBonusHunts();
-    const contextoAtual = contextoMedicao(equipe, golpesAtivos, bonus);
     if (mostraAnalise) {
       const historicoAtual = equipe && consultarHistorico(equipe.chave, contextoAtual);
       apresentar(equipe, cacada, historicoAtual);
       const referencia = historicoAtual?.rendimentos.find(item => item.area === cacada?.slug);
       recomendar(equipe, golpesAtivos, referencia, bonus);
+    }
+    if (testesAtivos) {
+      await testes.atualizar(estado);
+      return reiniciarJanela();
     }
     const atual = sessao;
     if (!atual || !cacada.slug || !contextoAtual) return mostrar("hunt-medicao", "Aguardando uma caçada e a leitura dos golpes da equipe.");
@@ -518,7 +541,15 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
     }
     atual.proximaLeitura = Date.now() + INTERVALO_LEITURA;
     atual.lendo = true;
-    try { atual.mensagem = await medir(atual, cacada, popup, contextoAtual); }
+    try {
+      await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
+        const leitura = lerEstado();
+        if (lock && sessao === atual && leitura.cacada?.slug === cacada.slug && leitura.contexto === contextoAtual &&
+            !document.hidden && document.hasFocus() && !document.querySelector("dialog[open], #drawer.open, body.pvp-mode")) {
+          atual.mensagem = await medir(atual, leitura.cacada, popup, contextoAtual);
+        }
+      });
+    }
     catch { atual.mensagem = "Não foi possível salvar a medição desta caçada."; }
     finally { atual.lendo = false; }
     if (sessao === atual && visivel()) mostrar("hunt-medicao", atual.mensagem);
@@ -526,7 +557,7 @@ function criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHun
 
   setInterval(() => void atualizar(), 5000);
   const observar = new MutationObserver(() => {
-    if (!visivel() && !trocaHunts.ativa()) return reiniciarJanela();
+    if (!visivel() && !trocaHunts.ativa() && !testes.ativa()) return reiniciarJanela();
     acompanhar(equipeAtual(), lerCacada());
   });
   for (const id of ["party-members", "hunt-header", "hunt-clock"]) {

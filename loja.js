@@ -229,6 +229,22 @@
       #hunt-exportar, #hunt-importar { padding: 7px 10px; border: 1px solid #cfd8e5; border-radius: 7px;
         background: #fff; color: var(--azul); font-size: 11px; }
       #troca-status { padding: 12px; background: #eaf0f9; border-radius: 9px; color: #405b7e; }
+      .hunt-testes { margin-top: 12px; }
+      #aba-hunts .hunt-testes h3 { margin: 0 0 5px; }
+      .hunt-testes > p { color: var(--muted); font-size: 11px; }
+      #hunt-testar { width: 100%; margin-top: 12px; padding: 10px; border: 1px solid var(--azul);
+        border-radius: 8px; background: var(--azul); color: #fff; font-size: 12px; font-weight: 700; }
+      #hunt-testar:hover { background: #314f76; }
+      #hunt-teste-progresso { display: block; width: 100%; height: 7px; margin: 12px 0; appearance: none;
+        border: 0; border-radius: 9px; overflow: hidden; background: #e3eaf4; accent-color: #426fa6; }
+      #hunt-teste-progresso::-webkit-progress-bar { background: #e3eaf4; }
+      #hunt-teste-progresso::-webkit-progress-value { background: #426fa6; }
+      #hunt-teste-progresso::-moz-progress-bar { background: #426fa6; }
+      #hunt-teste-status { margin: 0; font-size: 11px; color: #405b7e; }
+      #hunt-teste-resultados { display: grid; gap: 8px; max-height: 280px; overflow: auto; scrollbar-width: thin; }
+      .hunt-resultado-teste { padding: 10px; border: 1px solid var(--borda); border-radius: 8px; background: #f7f9fc; }
+      .hunt-resultado-teste strong, .hunt-resultado-teste span, .hunt-resultado-teste small { display: block; }
+      .hunt-resultado-teste span { margin: 4px 0; font-size: 11px; }
       .tier-apresentacao { padding: 16px; background: var(--azul); color: #fff; border-radius: 12px; }
       .tier-apresentacao > span { color: #b9cbe3; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
       .tier-apresentacao h3 { margin: 4px 0 6px; font-size: 20px; letter-spacing: -.4px; }
@@ -378,6 +394,19 @@
       <section id="aba-hunts" aria-labelledby="abrir-hunts" hidden>
         <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
         <p id="hunt-atual"></p>
+        <section class="bloco-config hunt-testes" aria-labelledby="hunt-testes-titulo">
+          <h3 id="hunt-testes-titulo">Teste real das hunts</h3>
+          <p>Cinco minutos de coleta em cada hunt acessível, após até um minuto de adaptação de entrada.</p>
+          <label class="opcao-check"><input id="hunt-testar-repetir" type="checkbox"><span>Incluir hunts já medidas</span></label>
+          <button id="hunt-testar" type="button">Iniciar testes nas hunts</button>
+          <progress id="hunt-teste-progresso" max="1" value="0" aria-label="Progresso dos testes de hunts"></progress>
+          <p id="hunt-teste-status" role="status">Pronto para testar as hunts que precisam de medição.</p>
+          <p><small>Mantenha o jogo em foco. Ao concluir, retorna à hunt de origem. A troca automática aguarda esta rodada.</small></p>
+          <details class="regras" open>
+            <summary>Resultados desta rodada</summary>
+            <div class="conteudo-regras"><div id="hunt-teste-resultados"></div></div>
+          </details>
+        </section>
         <h3>Estimativas para seu nível</h3>
         <div class="hunt-resumo"><strong>Melhor estimativa de XP do treinador</strong><span id="hunt-estimativa-xp"></span></div>
         <p><small id="hunt-bonus-xp"></small></p>
@@ -400,7 +429,7 @@
           <input id="hunt-arquivo" type="file" accept=".json,application/json" hidden>
           <p id="hunt-backup-status" role="status"></p>
         </details>
-        <p><small>As medições usam janelas de pelo menos 5 minutos com a análise aberta ou a troca automática ativa. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
+        <p><small>As medições usam janelas de pelo menos 5 minutos com a análise aberta, a troca automática ou os testes ativos. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
         <p>Escolhe a favorita disponível de maior nível. Se nenhuma favorita estiver disponível, escolhe a hunt disponível de maior nível.</p>
