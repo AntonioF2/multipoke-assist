@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.33**
+**Versão 1.5.34**
 
 ## Instalar ou atualizar
 
@@ -18,6 +18,8 @@ Em clones anteriores à mudança de nome, atualize o endereço com `git remote s
 ## Autocaptura
 
 A Autocaptura inicia ao abrir a página do jogo e usa o botão **Capturar** nos modos normal e economia. Use o botão roxo do painel para ligar ou desligar a captura. No Windows, o arquivo `Ativar Autocaptura.bat` permite reativá-la com a extensão instalada.
+
+No **modo economia**, o Assist acompanha automaticamente a parte inferior do painel da caçada, inclusive quando o conteúdo cresce ou a janela muda de tamanho. Com a Autocaptura ligada, traz cada botão **Capturar** pendente para a área visível antes de clicar, mesmo em listas maiores que a tela. Sem capturas pendentes, mantém a rolagem no fim do painel. A rolagem também continua com a Autocaptura pausada, enquanto o modo economia estiver ativo. Ela aguarda durante menus, diálogos e edição de campos; no modo normal, a posição de rolagem é livre.
 
 Ao escolher uma Poké Bola para reposição, a extensão mantém essa bola equipada no Auto Helper enquanto a Autocaptura ou a reposição estiver ativa. Se o estoque zerar, a Autocaptura aguarda a reposição e a confirmação da seleção. Escolha **Sem reposição** para usar livremente a bola selecionada no jogo.
 

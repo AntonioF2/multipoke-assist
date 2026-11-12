@@ -21,7 +21,37 @@
   let capturaAtiva = false;
   const selecoesPendentes = new Map();
 
+  function botaoDisponivel(botao) {
+    return !botao.matches(":disabled, [aria-disabled='true']") && botao.textContent.trim() === "Capturar" &&
+      botao.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) !== false;
+  }
+
+  function acompanharEconomia() {
+    if (!raiz.classList.contains("economy-mode") || document.hidden ||
+        document.querySelector("#game-shell[inert], #connection-screen:not([hidden]), #starter-overlay:not([hidden]), " +
+          "#drawer.open, dialog[open], #hunt-map-overlay:not([hidden]), #analyzer-insight:not([hidden]), body.pvp-mode")) return;
+    const foco = document.activeElement?.shadowRoot?.activeElement ?? document.activeElement;
+    if (foco?.matches("input, select, textarea, [contenteditable='true']")) return;
+    const painel = document.querySelector("#economy-hunt:not([hidden])");
+    if (!painel || painel.checkVisibility?.({ visibilityProperty: true }) === false || !painel.clientHeight) return;
+
+    const alvo = capturaAtiva && [...painel.querySelectorAll("button[data-economy-capture]")]
+      .find(botao => botao.dataset.economyCapture && !tentados.has(botao.dataset.economyCapture) && botaoDisponivel(botao));
+    let topo = painel.scrollHeight - painel.clientHeight;
+    if (alvo) {
+      const area = painel.getBoundingClientRect();
+      const inicio = Math.max(0, area.top + painel.clientTop);
+      const fim = Math.min(innerHeight, area.top + painel.clientTop + painel.clientHeight);
+      const botao = alvo.getBoundingClientRect();
+      if (botao.top >= inicio && botao.bottom <= fim) return;
+      // O modo economia rola dentro do próprio painel, não no documento.
+      topo = painel.scrollTop + botao.top + botao.height / 2 - (inicio + fim) / 2;
+    }
+    if (Math.abs(painel.scrollTop - topo) > 1) painel.scrollTo({ top: topo, behavior: "instant" });
+  }
+
   function clicarSeDisponivel() {
+    acompanharEconomia();
     const treinadorDaCompra = raiz.dataset.multipokeTreinadorReposicaoAtiva;
     if (!capturaAtiva && !treinadorDaCompra) return;
     const treinador = document.querySelector("#party-trainer-name")?.textContent.trim();
@@ -56,9 +86,7 @@
         presentes.add(alvo);
         continue;
       }
-      if (proximo || botao.matches(":disabled, [aria-disabled='true']")) continue;
-      if (botao.textContent.trim() !== "Capturar" ||
-          botao.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) === false) continue;
+      if (proximo || !botaoDisponivel(botao)) continue;
 
       const area = botao.getBoundingClientRect();
       const visivel = document.elementFromPoint(area.left + area.width / 2, area.top + area.height / 2);
