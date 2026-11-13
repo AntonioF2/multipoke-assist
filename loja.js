@@ -485,7 +485,7 @@
           <p class="descricao">Acompanhe uma transmissão no player oficial do jogo.</p>
           <label class="opcao-check"><input id="live-automatica" type="checkbox"> Manter uma live aberta automaticamente</label>
           <p id="live-status" role="status">Automação de lives desligada.</p>
-          <small>Reaproveita a janela MultiPoke TV aberta e troca de canal quando a live encerra. Para o bônus, vincule sua Twitch e mantenha a reprodução real. O navegador pode pedir um clique em Iniciar transmissão.</small>
+          <small>Reaproveita a janela MultiPoke TV e troca de canal quando a live encerra. Tenta iniciar o vídeo sem som; você pode ajustar o áudio no player. O bônus exige Twitch vinculada e reprodução real.</small>
         </section>
       </section>
       <section id="aba-pokedex" aria-labelledby="abrir-pokedex" hidden>

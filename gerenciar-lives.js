@@ -13,6 +13,30 @@ const gerenciadorLives = (() => {
   const salvar = estado => transacaoHunts(["lives"], "readwrite", transacao =>
     pedidoHunts(transacao.objectStore("lives").put(estado)));
   const jogo = aba => /^https:\/\/multipoke\.io\/jogar\/?(?:[?#].*)?$/.test(aba?.pendingUrl || aba?.url || "");
+  const armarInicio = estado => {
+    estado.ciclo = crypto.randomUUID();
+    estado.inicioEm = Date.now();
+    estado.documento = null;
+    estado.iniciar = true;
+    estado.tentarPlayer = true;
+    estado.pausaManual = false;
+  };
+
+  function iframeTwitch(url) {
+    try {
+      const frame = new URL(url);
+      return frame.origin === "https://player.twitch.tv" &&
+        frame.searchParams.getAll("parent").includes("multipoke.io") &&
+        /^[A-Za-z0-9_]{1,25}$/.test(frame.searchParams.get("channel") ?? "") ? frame : null;
+    } catch { return null; }
+  }
+
+  async function lerPlayer(aba) {
+    const [leitura] = await chrome.scripting.executeScript({ target: { tabId: aba.id, frameIds: [0] },
+      func: () => ({ estado: document.querySelector("[data-watch-status]")?.dataset.state ?? "",
+        frames: [...document.querySelectorAll("#twitch-player iframe")].map(frame => frame.src) }) }).catch(() => []);
+    return leitura;
+  }
 
   function sala(aba) {
     try {
@@ -71,7 +95,7 @@ const gerenciadorLives = (() => {
     if (!estado.ativa) return estado;
     const anterior = estado.abaLive ? await chrome.tabs.get(estado.abaLive).catch(() => null) : null;
     const perdeuJanela = Boolean(estado.abaLive) && !sala(anterior);
-    if (!forcar && !perdeuJanela && !estado.aguardaJogo && Date.now() - (estado.consulta ?? 0) < 60_000) return estado;
+    if (!forcar && estado.ciclo && !perdeuJanela && !estado.aguardaJogo && Date.now() - (estado.consulta ?? 0) < 60_000) return estado;
     estado.consulta = Date.now();
     const abas = (await chrome.tabs.query({ url: "https://multipoke.io/*" })).filter(aba => Boolean(aba.incognito) === privado);
     const jogos = abas.filter(jogo);
@@ -90,11 +114,12 @@ const gerenciadorLives = (() => {
       estado.abaLive = atual?.id ?? null;
       estado.canal = atual ? sala(atual).chave : null;
       estado.reproducao = "";
-      estado.iniciar = false;
+      armarInicio(estado);
     }
     if (atual && estado.canal !== sala(atual).chave) {
-      estado.canal = sala(atual).chave; estado.reproducao = ""; estado.iniciar = false;
+      estado.canal = sala(atual).chave; estado.reproducao = ""; armarInicio(estado);
     }
+    if (!estado.ciclo) armarInicio(estado);
     let canais;
     try {
       const [resultado] = await chrome.scripting.executeScript({ target: { tabId: origem.id }, func: consultarCatalogo });
@@ -124,7 +149,7 @@ const gerenciadorLives = (() => {
       estado.abaLive = outra.id;
       estado.canal = sala(outra).chave;
       estado.reproducao = "";
-      estado.iniciar = false;
+      armarInicio(estado);
       estado.status = "Reaproveitando outra janela MultiPoke TV já aberta.";
       await salvar(estado);
       if (atual) {
@@ -149,7 +174,7 @@ const gerenciadorLives = (() => {
       estado.abaLive = preservada.id;
       estado.canal = sala(preservada).chave;
       estado.reproducao = "";
-      estado.iniciar = false;
+      armarInicio(estado);
       estado.consulta = 0;
       await salvar(estado);
       return reconciliar(privado, true);
@@ -169,7 +194,7 @@ const gerenciadorLives = (() => {
     estado.abaLive = aba.id;
     estado.canal = `twitch:${proximo.canal}`;
     estado.reproducao = "loading";
-    estado.iniciar = true;
+    armarInicio(estado);
     estado.status = `Abrindo ${proximo.nome} no player oficial. Aguardando reprodução real.`;
     await salvar(estado);
     await instalarMonitor(aba);
@@ -180,27 +205,66 @@ const gerenciadorLives = (() => {
   async function mensagem(dados, remetente) {
     const aba = remetente.tab;
     const privado = Boolean(aba.incognito);
+    if (dados.acao === "player" && remetente.frameId > 0 && iframeTwitch(remetente.url) && sala(aba)?.plataforma === "twitch") {
+      const estado = await ler(privado);
+      const atual = await chrome.tabs.get(aba.id).catch(() => null);
+      if (!estado.ativa || estado.abaLive !== aba.id || estado.canal !== sala(atual)?.chave) return { monitorar: false };
+      const [origem] = await chrome.scripting.executeScript({ target: { tabId: aba.id, frameIds: [remetente.frameId] },
+        func: () => location.href }).catch(() => []);
+      if (!origem || !iframeTwitch(origem.result) || remetente.documentId && origem.documentId !== remetente.documentId) return { monitorar: false };
+      const leitura = await lerPlayer(atual);
+      const frame = iframeTwitch(remetente.url);
+      if (!leitura?.result?.frames.some(url => iframeTwitch(url)?.searchParams.get("channel")?.toLowerCase() === frame.searchParams.get("channel").toLowerCase())) {
+        return { monitorar: false };
+      }
+      const pausaRecente = dados.manual === true && (dados.ciclo === estado.ciclo ||
+        Number.isSafeInteger(dados.manualEm) && dados.manualEm >= estado.inicioEm);
+      if (pausaRecente) {
+        estado.pausaManual = true; estado.iniciar = false; estado.tentarPlayer = false;
+        estado.status = "Player pausado por você. A reprodução permanece sob seu controle.";
+      } else if (dados.tocando === true) {
+        estado.iniciar = false; estado.tentarPlayer = false; estado.pausaManual = false;
+        // Reprodução não equivale à confirmação do bônus pelo servidor.
+        if (!["active", "validating"].includes(leitura.result.estado)) estado.status = "Vídeo em reprodução. Aguardando o jogo validar o bônus.";
+      } else if (dados.falhou === true && dados.ciclo === estado.ciclo) {
+        estado.iniciar = false; estado.tentarPlayer = false;
+        if (!["active", "validating"].includes(leitura.result.estado)) estado.status = "O player não iniciou após as tentativas. Clique no play da janela da live.";
+      }
+      await salvar(estado);
+      const dentroPrazo = Date.now() - (estado.inicioEm ?? 0) < 60_000;
+      return { ciclo: estado.ciclo, monitorar: estado.tentarPlayer && !estado.pausaManual && dentroPrazo,
+        iniciar: estado.tentarPlayer && !estado.pausaManual && dentroPrazo &&
+          Date.now() - estado.inicioEm >= 1000 && ["ready", "paused", "blocked"].includes(leitura.result.estado) };
+    }
     if (dados.acao === "estado" && sala(aba)) {
       const estado = await ler(privado);
       if (!estado.ativa || estado.abaLive !== aba.id || estado.canal !== sala(aba).chave) return { iniciar: false };
       const atual = await chrome.tabs.get(aba.id).catch(() => null);
       if (sala(atual)?.chave !== sala(aba).chave) return { iniciar: false };
-      const [leitura] = await chrome.scripting.executeScript({ target: { tabId: aba.id, frameIds: [0] },
-        func: () => document.querySelector("[data-watch-status]")?.dataset.state ?? "" }).catch(() => []);
-      if (!leitura || (remetente.documentId && leitura.documentId !== remetente.documentId) || leitura.result !== dados.estado) return { iniciar: false };
+      const leitura = await lerPlayer(atual);
+      if (!leitura || (remetente.documentId && leitura.documentId !== remetente.documentId) || leitura.result.estado !== dados.estado) return { iniciar: false };
+      if (estado.documento && estado.documento !== remetente.documentId) armarInicio(estado);
+      estado.documento = remetente.documentId ?? null;
       const reproducao = typeof dados.estado === "string" && /^[a-z-]{1,30}$/.test(dados.estado) ? dados.estado : "";
       const mudou = estado.reproducao !== reproducao;
       estado.reproducao = reproducao;
       if (descricoes[reproducao]) estado.status = descricoes[reproducao];
-      const iniciar = estado.iniciar && reproducao === "ready" && sala(aba).plataforma === "twitch";
-      if (iniciar) { estado.iniciar = false; estado.status = "Tentando iniciar o vídeo pelo botão oficial da transmissão."; }
-      if (["validating", "active", "paused", "blocked", "guest-playing", "guest-paused"].includes(reproducao)) estado.iniciar = false;
+      if (dados.manual === true && (dados.ciclo === estado.ciclo || Number.isSafeInteger(dados.manualEm) && dados.manualEm >= estado.inicioEm)) {
+        estado.pausaManual = true; estado.iniciar = false; estado.tentarPlayer = false;
+      }
+      if (["validating", "active", "guest-playing"].includes(reproducao)) {
+        estado.iniciar = false; estado.tentarPlayer = false;
+      }
+      const dentroPrazo = Date.now() - (estado.inicioEm ?? 0) < 60_000;
+      const iniciar = estado.iniciar && !estado.pausaManual && dentroPrazo &&
+        ["ready", "paused", "blocked"].includes(reproducao) && sala(aba).plataforma === "twitch";
+      if (iniciar) estado.status = "Aguardando o player ficar pronto para iniciar a reprodução real.";
       if (mudou && ["ended", "offline"].includes(reproducao)) {
         estado.descartados = { ...estado.descartados, [estado.canal]: Date.now() + 120_000 };
       }
       await salvar(estado);
       if (mudou && ["ended", "offline"].includes(reproducao)) await reconciliar(privado, true);
-      return { iniciar };
+      return { iniciar, ciclo: estado.ciclo, player: estado.tentarPlayer && !estado.pausaManual && dentroPrazo };
     }
     if (!jogo(aba)) throw new Error("Abra o jogo para configurar as lives.");
     let estado = await ler(privado);
@@ -209,7 +273,8 @@ const gerenciadorLives = (() => {
       estado.ativa = dados.ativa;
       estado.abaJogo = aba.id;
       estado.consulta = 0;
-      if (!estado.ativa) { estado.iniciar = false; estado.status = "Automação desligada. A janela da live permanece sob seu controle."; }
+      if (estado.ativa) armarInicio(estado);
+      else { estado.iniciar = false; estado.tentarPlayer = false; estado.status = "Automação desligada. A janela da live permanece sob seu controle."; }
       await salvar(estado);
       await garantirAlarme();
       if (estado.ativa) estado = await reconciliar(privado, true);
@@ -235,8 +300,10 @@ const gerenciadorLives = (() => {
   chrome.runtime.onStartup.addListener(() => void verificar(true));
   chrome.runtime.onInstalled.addListener(() => void verificar(true));
   chrome.runtime.onMessage.addListener((dados, remetente, responder) => {
-    if (dados?.tipo !== "multipoke:lives" || remetente.id !== chrome.runtime.id || !remetente.tab || remetente.frameId !== 0 ||
-        (!jogo(remetente.tab) && !sala(remetente.tab))) return;
+    if (dados?.tipo !== "multipoke:lives" || remetente.id !== chrome.runtime.id || !remetente.tab) return;
+    const origemValida = remetente.frameId === 0 && (jogo(remetente.tab) || sala(remetente.tab));
+    const playerValido = dados.acao === "player" && remetente.frameId > 0 && iframeTwitch(remetente.url) && sala(remetente.tab);
+    if (!origemValida && !playerValido) return;
     serializar(() => mensagem(dados, remetente)).then(resultado => responder({ ok: true, resultado }),
       erro => responder({ ok: false, erro: erro.message }));
     return true;

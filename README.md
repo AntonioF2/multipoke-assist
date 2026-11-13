@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.39**
+**Versão 1.5.40**
 
 ## Instalar ou atualizar
 
@@ -82,7 +82,9 @@ Na aba **Grind**, marque **Manter uma live aberta automaticamente** para acompan
 
 A checagem periódica usa o catálogo do jogo, aproximadamente a cada minuto, e também reage ao encerramento informado pelo player. Catálogo indisponível ou desatualizado preserva a janela atual; sem outra live Twitch elegível, aguarda. A permissão **alarms** permite consultar periodicamente sem depender do contador da página. A automação abre novas salas enquanto houver uma aba do jogo no mesmo perfil. Janelas privadas, quando a extensão estiver autorizada nelas, usam controle separado.
 
-O bônus depende da **Twitch vinculada e de reprodução real**, validada pelo jogo. A extensão tenta iniciar uma transmissão nova pelo botão oficial uma vez; se o navegador bloquear, clique em **Iniciar transmissão** na sala. Uma pausa manual permanece sob seu controle. O status informa falhas, vínculo pendente e confirmação pelo player, e também identifica o indicador de XP ativo no jogo. A seleção automática usa Twitch; uma sala Kick já aberta é preservada enquanto estiver disponível e mostra a orientação do próprio jogo, pois o bônus dessa plataforma exige atividade manual. Desmarcar a opção interrompe o gerenciamento e mantém a janela atual aberta.
+O bônus depende da **Twitch vinculada e de reprodução real**, validada pelo jogo. A extensão aguarda o player ficar pronto, tenta o botão oficial até duas vezes e, se necessário, inicia o vídeo incorporado **sem som**, com até três tentativas. Um estado inicial de pausado não cancela essa preparação. O início só é reconhecido quando há reprodução real ou o jogo confirma o estado; a extensão não cria eventos de audiência. As tentativas são limitadas para evitar repetições contínuas. Você pode ativar o áudio pelos controles da Twitch. Para acessar somente esse vídeo, a extensão usa a permissão de `player.twitch.tv`; a ação é autorizada apenas no iframe da sala MultiPoke TV gerenciada, com a opção ligada. Recarregue também uma janela de live que já estava aberta ao atualizar a extensão.
+
+Uma pausa manual posterior permanece sob seu controle. Desligar e ligar a opção novamente autoriza uma nova tentativa. Se o navegador ainda impedir a reprodução, clique em **Iniciar transmissão** na sala. O status informa falhas, vínculo pendente e confirmação pelo player, e também identifica o indicador de XP ativo no jogo. A seleção automática usa Twitch; uma sala Kick já aberta é preservada enquanto estiver disponível e mostra a orientação do próprio jogo, pois o bônus dessa plataforma exige atividade manual. Desmarcar a opção interrompe o gerenciamento e mantém a janela atual aberta.
 
 ## Melhorias automáticas da Pokédex
 
