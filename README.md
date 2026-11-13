@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.43**
+**Versão 1.5.44**
 
 ## Instalar ou atualizar
 
@@ -48,6 +48,10 @@ A Poké Bola, a poção e o revive escolhidos para reposição também são sele
 Em **Venda automática**, escolha **Somente marcados para venda** para vender apenas itens autorizados ou **Abaixo de 10.000 e itens marcados** para incluir loot elegível abaixo de 10.000 Pokédollars por unidade. Itens a partir de 10.000 exigem autorização individual.
 
 Em **Permissões de venda por item**, busque por nome ou ID e use **Permitir venda** ou **Bloquear venda**. O bloqueio vale em qualquer modo. Antes de vender, o MultiPoke Assist limpa a seleção anterior de loot e confere os itens do lote.
+
+A leitura prioriza os objetos do catálogo enviados pelo jogo, com ID, preço de NPC e restrições de venda. O estoque e a quantidade vêm dos controles numéricos do inventário, e as permissões são associadas ao ID para preservar os bloqueios mesmo quando o nome exibido muda. A extensão observa somente os metadados do catálogo na conexão existente, sem abrir conexões adicionais ou enviar comandos por ela. Recarregue o jogo após atualizar para receber esses dados desde o início.
+
+Se os objetos não estiverem disponíveis, a leitura alternativa reconhece o preço resumido e a descrição de venda à Loja NPC da Pokepédia. A disponibilidade de obtenção do item não bloqueia a venda de estoque já existente. Somente loots com preço de NPC válido e listados nos controles de venda da loja entram no lote; itens sem preço continuam indisponíveis.
 
 ### Vender Pokémon
 

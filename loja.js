@@ -633,6 +633,7 @@
   const camposPokemon = ["pokemon-qualidade", "pokemon-iv", "pokemon-condicao"];
   const escolhasCompra = new Map();
   const regrasLoot = new Map();
+  const objetosLoot = new Map();
   let estoqueLoot = new Map();
   let catalogo;
   let proximaConsultaCatalogo = 0;
@@ -667,19 +668,42 @@
       const nome = texto(item, "h2");
       const id = item.dataset.filterNumber;
       if (!nome || !/^\d+$/.test(id)) continue;
-      const preco = numero(texto(item, "p").match(/^Venda · ([\d.]+) Pokédollars$/)?.[1]);
-      const vendavel = item.dataset.filterAvailable === "yes" && normalizar(nome) !== "ruby" &&
-        inteiro(preco, 1, Number.MAX_SAFE_INTEGER);
-      itens.set(chaveLoot(`id:${id}`, nome), { id, nome, preco, vendavel });
+      // A disponibilidade de obtenção não determina se o loot pode ser vendido.
+      // A Pokepédia usa o preço resumido e o texto novo de venda à Loja NPC.
+      const descricao = texto(item, "p").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+      const preco = numero(descricao.match(/^venda(?:\s*·\s*|\s+a loja npc por\s+)([\d.]+)\s+pokedollars(?:\s+cada(?:\.|$)|$)/)?.[1]);
+      const vendavel = inteiro(preco, 1, Number.MAX_SAFE_INTEGER);
+      const objeto = objetosLoot.get(`id:${id}`);
+      itens.set(chaveLoot(`id:${id}`, nome), { id, nome, preco, vendavel, ...objeto });
     }
     if (!itens.size) throw new Error("A Pokepédia não apresentou o catálogo de loot esperado.");
-    catalogo = itens;
+    // Um catálogo estruturado recebido durante o fetch tem prioridade.
+    catalogo ??= itens;
   }
 
-  const chaveLoot = (id, nome) => `${id}:${normalizar(nome)}`;
+  const chaveLoot = (id, nome) => /^id:\d+$/.test(id) ? id : `${id}:${normalizar(nome)}`;
   const chaveRegras = () => `multipoke.auto-loja.loot.${treinadorConfigurado}`;
   const chaveCompra = id => `multipoke.auto-loja.compra.${treinadorConfigurado}.${id}`;
   const chavePokemon = id => `multipoke.auto-loja.pokemon.${treinadorConfigurado}.${id}`;
+
+  document.addEventListener("multipoke:objetos-loot", event => {
+    if (typeof event.detail !== "string" || event.detail.length > 2_000_000) return;
+    let dados;
+    try { dados = JSON.parse(event.detail); } catch { return; }
+    if (!Array.isArray(dados) || !dados.length || dados.length > 10000 || !dados.every(item =>
+      inteiro(item?.id, 1, Number.MAX_SAFE_INTEGER) && typeof item.nome === "string" && item.nome.length > 0 && item.nome.length <= 200 &&
+      inteiro(item.preco, 0, Number.MAX_SAFE_INTEGER) && typeof item.vendavel === "boolean" && (!item.vendavel || item.preco > 0)) ||
+      new Set(dados.map(item => item.id)).size !== dados.length) return;
+    objetosLoot.clear();
+    for (const item of dados) objetosLoot.set(`id:${item.id}`, { ...item, id: String(item.id) });
+    catalogo ??= new Map();
+    for (const [chave, item] of objetosLoot) {
+      // Preço zero em suprimentos e moedas não transforma esses itens em loot.
+      if (item.preco > 0 || catalogo.has(chave)) catalogo.set(chave, item);
+    }
+    mostrarCatalogo();
+  });
+  document.dispatchEvent(new Event("multipoke:consultar-objetos-loot"));
 
   function publicarReposicao() {
     raiz.dataset.multipokeTreinadorReposicao = treinadorConfigurado;
@@ -710,7 +734,11 @@
     try {
       const salvas = JSON.parse(localStorage.getItem(chaveRegras()));
       for (const [chave, regra] of Object.entries(salvas ?? {})) {
-        if (["vender", "vender-acima-do-limite", "proteger"].includes(regra)) regrasLoot.set(chave, regra);
+        if (!["vender", "vender-acima-do-limite", "proteger"].includes(regra)) continue;
+        const id = chave.match(/^id:(\d+)(?::|$)/)?.[1];
+        const atual = id ? `id:${id}` : chave;
+        // Preserva bloqueios legados, inclusive se houver duas regras para o mesmo ID.
+        if (regrasLoot.get(atual) !== "proteger") regrasLoot.set(atual, regra);
       }
     } catch { /* As regras podem ser usadas nesta aba sem armazenamento. */ }
   }
@@ -732,9 +760,13 @@
     const linha = caixa.closest(".loot-ledger-row");
     const id = caixa.dataset.lootSelect;
     const nome = texto(linha, ".loot-identity strong");
-    const preco = numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
-    const estoque = numero(texto(linha, ".loot-count strong").match(/^×\s*([\d.]+)$/)?.[1]);
-    const digitado = Number(linha.querySelector("[data-loot-sale-qty]")?.value);
+    const objeto = objetosLoot.get(id);
+    const preco = objeto?.preco ?? numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
+    const controle = linha.querySelector("input[data-loot-sale-qty]");
+    const maximo = Number(controle?.dataset.uiIntegerMax ?? controle?.max);
+    const estoque = inteiro(maximo, 1, Number.MAX_SAFE_INTEGER) ? maximo
+      : numero(texto(linha, ".loot-count strong").match(/^×\s*([\d.]+)$/)?.[1]);
+    const digitado = controle?.type === "number" ? controle.valueAsNumber : numero(controle?.value);
     const chave = chaveLoot(id, nome);
     if (!catalogo?.has(chave) || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
         !inteiro(estoque, 1, Number.MAX_SAFE_INTEGER)) return null;
@@ -783,7 +815,7 @@
     const partes = [`#${item.id}`];
     if (Number.isFinite(item.preco)) partes.push(`${formatar(item.preco)} por unidade`);
     if (estoque) partes.push(`${formatar(estoque)} na loja`);
-    if (!item.vendavel) partes.push("indisponível para venda automática");
+    if (!item.vendavel) partes.push("sem preço de venda ao NPC no catálogo");
     else if (item.preco >= LIMITE_LOOT) partes.push("exige permissão explícita");
     escrever(rotulo, partes.join(" · "));
   }
