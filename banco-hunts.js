@@ -10,7 +10,7 @@ function pedidoHunts(pedido) {
 
 function abrirBancoHunts() {
   bancoHunts ??= (() => {
-    const pedido = indexedDB.open("multipoke-hunts", 2);
+    const pedido = indexedDB.open("multipoke-hunts", 3);
     pedido.onupgradeneeded = () => {
       const banco = pedido.result;
       if (!banco.objectStoreNames.contains("catalogo")) {
@@ -20,7 +20,11 @@ function abrirBancoHunts() {
         banco.createObjectStore("recordes", { keyPath: ["equipe", "area"] })
           .createIndex("equipe", "equipe");
       }
-      pedido.transaction.objectStore("medicoes").createIndex("equipe", "equipe");
+      const medicoes = pedido.transaction.objectStore("medicoes");
+      if (!medicoes.indexNames.contains("equipe")) medicoes.createIndex("equipe", "equipe");
+      if (!banco.objectStoreNames.contains("pokedex")) {
+        banco.createObjectStore("pokedex", { keyPath: ["treinador", "id"] }).createIndex("treinador", "treinador");
+      }
     };
     return pedidoHunts(pedido).then(banco => {
       banco.onversionchange = () => {
@@ -171,12 +175,51 @@ function exportarHistoricoHunts() {
   });
 }
 
+function configurarPokedex(mensagem) {
+  const { treinador, id, acao } = mensagem;
+  if (typeof treinador !== "string" || !treinador.trim() || treinador.length > 120 ||
+      (acao !== "dex-listar" && (typeof id !== "string" || !/^[1-9]\d{0,5}$/.test(id)))) {
+    throw new Error("Treinador ou espécie inválidos.");
+  }
+  if (acao === "dex-listar") return transacaoHunts(["pokedex"], "readonly", transacao =>
+    pedidoHunts(transacao.objectStore("pokedex").index("treinador").getAll(treinador)));
+  return transacaoHunts(["pokedex"], "readwrite", async transacao => {
+    const loja = transacao.objectStore("pokedex");
+    const anterior = await pedidoHunts(loja.get([treinador, id]));
+    let regra;
+    if (acao === "dex-configurar") {
+      const { nome, tipos, ativa, revisao } = mensagem;
+      if (typeof nome !== "string" || !nome || nome.length > 120 || typeof ativa !== "boolean" ||
+          !Array.isArray(tipos) || tipos.length > 3 || new Set(tipos).size !== tipos.length ||
+          tipos.some(tipo => !["capture", "loot", "shiny"].includes(tipo)) || (ativa && !tipos.length)) {
+        throw new Error("Configuração da Pokédex inválida.");
+      }
+      if (revisao !== (anterior?.revisao ?? 0)) throw new Error("A configuração mudou em outra aba. Tente novamente.");
+      if (anterior?.pendente && ativa) throw new Error("Aguarde a confirmação da melhoria antes de ativar ou editar.");
+      regra = { ...anterior, treinador, id, nome, tipos, ativa, aviso: anterior?.pendente ? "Confirmando a última melhoria." : "" };
+    } else if (acao === "dex-reservar") {
+      if (!anterior?.ativa || anterior.pendente || anterior.revisao !== mensagem.revisao ||
+          !anterior.tipos.includes(mensagem.categoria) || typeof mensagem.token !== "string" || mensagem.token.length > 80) return null;
+      regra = { ...anterior, pendente: { token: mensagem.token, data: Date.now() }, aviso: "Confirmando melhoria no jogo." };
+    } else if (acao === "dex-finalizar") {
+      if (!anterior?.pendente || anterior.pendente.token !== mensagem.token) return anterior ?? null;
+      if (typeof mensagem.confirmada !== "boolean") throw new Error("Confirmação inválida.");
+      regra = { ...anterior, pendente: null, ativa: mensagem.confirmada && anterior.ativa,
+        aviso: mensagem.confirmada ? "Última melhoria confirmada no jogo." : "Sem confirmação. Confira no jogo antes de reativar." };
+    } else throw new Error("Operação da Pokédex desconhecida.");
+    regra.revisao = (anterior?.revisao ?? 0) + 1;
+    await pedidoHunts(loja.put(regra));
+    return regra;
+  });
+}
+
 chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
   if (mensagem?.tipo !== "multipoke:banco-hunts" || remetente.id !== chrome.runtime.id ||
       !/^https:\/\/multipoke\.io\/jogar\/?(?:[?#].*)?$/.test(remetente.url ?? "")) return;
 
   const { acao, chave, valor } = mensagem;
   async function executar() {
+    if (["dex-listar", "dex-configurar", "dex-reservar", "dex-finalizar"].includes(acao)) return configurarPokedex(mensagem);
     switch (acao) {
       case "ler-cache":
       case "salvar-cache": {

@@ -150,7 +150,37 @@
       #abas button:hover { background: #e9eef6; }
       #abas button[aria-pressed="true"] { background: #fff; border-color: var(--borda); color: var(--azul);
         box-shadow: 0 1px 3px #22375409; }
-      #aba-hunts, #aba-troca, #aba-tierlist { padding: 14px; }
+      #aba-hunts, #aba-troca, #aba-tierlist, #aba-pokedex { padding: 14px; }
+      .dex-apresentacao { padding: 17px; border-radius: 12px; color: #fff;
+        background: linear-gradient(135deg, #263d60, #3d5480); }
+      .dex-apresentacao > span { font-size: 9px; font-weight: 800; letter-spacing: .14em; color: #b9cbe9; }
+      .dex-apresentacao h3 { font-size: 19px; margin: 6px 0; }
+      .dex-apresentacao p { margin: 0; font-size: 12px; color: #e4ecfa; }
+      #dex-treinador { display: block; margin-top: 12px; color: #405b7e; }
+      #dex-busca { width: 100%; margin: 8px 0; }
+      #dex-resultados { display: grid; gap: 5px; max-height: 240px; overflow: auto; }
+      #dex-resultados:empty { display: none; }
+      .dex-resultado { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px;
+        border: 1px solid var(--borda); border-radius: 9px; background: #fff; color: var(--azul); text-align: left; }
+      .dex-resultado img { width: 36px; height: 36px; image-rendering: pixelated; }
+      .dex-resultado span { flex: 1; }
+      #dex-regras { display: grid; gap: 12px; }
+      .dex-regra { padding: 12px; border: 1px solid var(--borda); border-radius: 12px; background: #fff; }
+      .dex-regra[data-ativa="true"] { border-color: #82b59d; box-shadow: inset 3px 0 #4a9670; }
+      .dex-regra-cabecalho { display: flex; gap: 8px; align-items: center; }
+      .dex-regra-cabecalho img { image-rendering: pixelated; flex: none; }
+      .dex-regra-cabecalho > div { flex: 1; min-width: 0; }
+      .dex-regra-cabecalho strong, .dex-regra-cabecalho small { display: block; overflow-wrap: anywhere; }
+      .dex-alternar { border: 1px solid var(--borda); border-radius: 20px; padding: 7px 9px;
+        font-size: 11px; color: var(--muted); background: #f2f5f9; }
+      .dex-alternar[aria-pressed="true"] { background: #e5f4ec; color: #286b49; border-color: #a7ceba; }
+      .dex-regra fieldset { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 10px 0 0; margin: 8px 0 0;
+        border-top: 1px solid #edf0f5; }
+      .dex-regra legend { font-size: 10px; color: var(--muted); padding: 0 5px 0 0; }
+      .dex-regra label { display: flex; align-items: center; gap: 5px; font-size: 11px; margin: 0; }
+      .dex-regra input[type="checkbox"] { width: 15px; height: 15px; accent-color: #405e88; }
+      .dex-regra-nota, .dex-vazio, #dex-status { margin: 10px 0 0; font-size: 11px; color: #61728a; line-height: 1.6; }
+      #dex-status { margin: 10px 0; }
       #aba-hunts h3 { margin: 18px 0 9px; font-size: 13px; }
       .hunt-resumo { margin: 8px 0; padding: 12px; background: #fff; border: 1px solid var(--borda); border-radius: 10px; }
       .hunt-resumo strong, .hunt-resumo span { display: block; }
@@ -326,6 +356,7 @@
         <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">Hunts</button>
         <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Grind" title="Grind">Grind</button>
         <button id="abrir-tierlist" type="button" aria-controls="aba-tierlist" aria-pressed="false">Tierlist</button>
+        <button id="abrir-pokedex" type="button" aria-controls="aba-pokedex" aria-pressed="false">Pokédex</button>
       </div>
       <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
@@ -437,6 +468,16 @@
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
       </section>
+      <section id="aba-pokedex" aria-labelledby="abrir-pokedex" hidden>
+        <div class="dex-apresentacao"><span>PROGRESSÃO · POR ESPÉCIE</span>
+          <h3>Domínio da Pokédex</h3><p>Escolha seus Pokémon e autorize os bônus que deseja melhorar.</p></div>
+        <small id="dex-treinador">Aguardando um treinador.</small>
+        <input id="dex-busca" type="search" placeholder="Buscar Pokémon por nome ou número" aria-label="Buscar Pokémon para melhoria automática" autocomplete="off">
+        <div id="dex-resultados" aria-label="Resultados da busca"></div>
+        <p><small>Use os Pontos Dex da espécie em melhorias permanentes. Marque os bônus e ative o Pokémon. Com vários marcados, priorizamos o menos melhorado. Editar as opções desativa a automação até uma nova ativação.</small></p>
+        <p id="dex-status" role="status">Nenhum Pokémon é ativado por padrão.</p>
+        <div id="dex-regras"></div>
+      </section>
       <section id="aba-tierlist" aria-labelledby="abrir-tierlist" hidden>
         <div class="tier-apresentacao">
           <span>POKEPÉDIA · RANKS OFICIAIS</span>
@@ -471,7 +512,8 @@
   const trocaHunts = criarTrocaHunts(campo, { formatar, treinador, podeInteragir: () => !ocupada });
   const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts });
   const atualizarTierlist = criarTierlist(campo, { normalizar });
-  const abas = ["loja", "hunts", "troca", "tierlist"];
+  const atualizarPokedex = criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir: () => !ocupada && !trocaHunts.emTroca() });
+  const abas = ["loja", "hunts", "troca", "tierlist", "pokedex"];
   for (const aba of abas) {
     campo(`abrir-${aba}`).addEventListener("click", () => {
       for (const nome of abas) {
@@ -480,6 +522,7 @@
       }
       if (aba === "loja") void atualizarEstoque();
       else if (aba === "tierlist") void atualizarTierlist();
+      else if (aba === "pokedex") void atualizarPokedex();
       else void atualizarAnalise();
     });
   }
@@ -1285,6 +1328,7 @@
   campo("painel").addEventListener("toggle", () => {
     if (!campo("aba-loja").hidden) void atualizarEstoque();
     else if (!campo("aba-tierlist").hidden && campo("painel").open) void atualizarTierlist();
+    else if (!campo("aba-pokedex").hidden && campo("painel").open) void atualizarPokedex();
     else void atualizarAnalise();
   });
   for (const id of camposCompra) {

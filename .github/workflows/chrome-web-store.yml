@@ -38,6 +38,7 @@ jobs:
           node --check troca-hunts.js
           node --check testes-hunts.js
           node --check tierlist.js
+          node --check pokedex.js
           node --check loja.js
           node --check ativar.js
           node --check barra.js

@@ -1,0 +1,321 @@
+function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir }) {
+  const categorias = { shiny: "Shiny chance", capture: "Catch rate", loot: "Loot" };
+  const lista = campo("dex-regras");
+  const resultados = campo("dex-resultados");
+  const busca = campo("dex-busca");
+  const status = campo("dex-status");
+  let dono = "";
+  let regras = [];
+  let catalogo = [];
+  let carregandoCatalogo;
+  let ocupada = false;
+  let salvando = false;
+  let ultimaEspecie = "";
+  let ultimaApresentacao;
+  let interacoes = 0;
+  let ultimaInteracao = -Infinity;
+  const notas = new Map();
+  const visivel = () => campo("painel").open && !campo("aba-pokedex").hidden;
+  const informar = mensagem => { if (status.textContent !== mensagem) status.textContent = mensagem; };
+  const esperar = tempo => new Promise(resolve => setTimeout(resolve, tempo));
+  const enviar = (acao, dados = {}, nome = dono) => enviarDadosHunts(acao, { treinador: nome, ...dados });
+
+  for (const evento of ["pointerdown", "keydown"]) {
+    document.addEventListener(evento, event => {
+      if (event.isTrusted) { interacoes++; ultimaInteracao = performance.now(); }
+    }, { capture: true, passive: true });
+  }
+
+  function imagem(id) {
+    const img = document.createElement("img");
+    img.width = img.height = 48;
+    img.alt = "";
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    img.crossOrigin = "anonymous";
+    img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+    img.addEventListener("error", () => { img.hidden = true; }, { once: true });
+    return img;
+  }
+
+  function mostrarRegras() {
+    if (!visivel()) return;
+    const assinatura = JSON.stringify([dono, regras, [...notas], salvando]);
+    if (assinatura === ultimaApresentacao) return;
+    ultimaApresentacao = assinatura;
+    const fragmento = document.createDocumentFragment();
+    for (const regra of [...regras].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))) {
+      const cartao = document.createElement("section");
+      cartao.className = "dex-regra";
+      cartao.dataset.especie = regra.id;
+      cartao.dataset.ativa = String(regra.ativa);
+      const cabecalho = document.createElement("div");
+      cabecalho.className = "dex-regra-cabecalho";
+      const titulo = document.createElement("div");
+      const numero = document.createElement("small");
+      numero.textContent = `#${regra.id.padStart(3, "0")}`;
+      const nome = document.createElement("strong");
+      nome.textContent = regra.nome;
+      titulo.append(numero, nome);
+      const alternar = document.createElement("button");
+      alternar.type = "button";
+      alternar.className = "dex-alternar";
+      alternar.textContent = regra.ativa ? "Ativada" : "Desativada";
+      alternar.setAttribute("aria-pressed", String(regra.ativa));
+      alternar.setAttribute("aria-label", `${regra.ativa ? "Desativar" : "Ativar"} melhorias de ${regra.nome}`);
+      alternar.disabled = salvando || (!regra.ativa && (!regra.tipos.length || Boolean(regra.pendente)));
+      alternar.addEventListener("click", () => void configurar({ ...regra, ativa: !regra.ativa }));
+      cabecalho.append(imagem(regra.id), titulo, alternar);
+      const opcoes = document.createElement("fieldset");
+      const legenda = document.createElement("legend");
+      legenda.textContent = "Melhorias autorizadas";
+      opcoes.append(legenda);
+      for (const [tipo, rotulo] of Object.entries(categorias)) {
+        const label = document.createElement("label");
+        const controle = document.createElement("input");
+        controle.type = "checkbox";
+        controle.checked = regra.tipos.includes(tipo);
+        controle.disabled = salvando || Boolean(regra.pendente);
+        controle.dataset.tipo = tipo;
+        controle.setAttribute("aria-label", `${rotulo} para ${regra.nome}`);
+        controle.addEventListener("change", () => {
+          const tipos = Object.keys(categorias).filter(item => item === tipo ? controle.checked : regra.tipos.includes(item));
+          void configurar({ ...regra, tipos, ativa: false });
+        });
+        label.append(controle, document.createTextNode(rotulo));
+        opcoes.append(label);
+      }
+      const nota = document.createElement("p");
+      nota.className = "dex-regra-nota";
+      nota.textContent = notas.get(regra.id) || regra.aviso || (regra.ativa
+        ? "Aguardando pontos disponíveis para esta espécie." : "Marque os bônus desejados e ative este Pokémon.");
+      cartao.append(cabecalho, opcoes, nota);
+      fragmento.append(cartao);
+    }
+    if (!regras.length) {
+      const vazio = document.createElement("p");
+      vazio.className = "dex-vazio";
+      vazio.textContent = "Busque um Pokémon acima para configurar suas melhorias. Nenhuma espécie é ativada automaticamente.";
+      fragmento.append(vazio);
+    }
+    lista.replaceChildren(fragmento);
+    campo("dex-treinador").textContent = dono ? `Configurações de ${dono}` : "Aguardando um treinador.";
+  }
+
+  function filtrar() {
+    resultados.replaceChildren();
+    const termo = normalizar(busca.value.trim()).replace(/^#/, "");
+    if (!termo) return;
+    const encontrados = catalogo.filter(item => normalizar(`${item.nome} ${item.id}`).includes(termo));
+    for (const pokemon of encontrados.slice(0, 20)) {
+      const botao = document.createElement("button");
+      botao.type = "button";
+      botao.className = "dex-resultado";
+      const configurado = regras.some(regra => regra.id === pokemon.id);
+      botao.disabled = salvando || configurado || !dono;
+      const nome = document.createElement("span");
+      nome.textContent = `#${pokemon.id.padStart(3, "0")} · ${pokemon.nome}`;
+      const acao = document.createElement("small");
+      acao.textContent = configurado ? "Adicionado" : "Adicionar";
+      botao.append(imagem(pokemon.id), nome, acao);
+      botao.addEventListener("click", () => void configurar({ ...pokemon, tipos: [], ativa: false, revisao: 0 }));
+      resultados.append(botao);
+    }
+    const nota = document.createElement("small");
+    nota.textContent = encontrados.length ? `${Math.min(20, encontrados.length)} de ${encontrados.length} resultados` : "Nenhum Pokémon encontrado.";
+    resultados.append(nota);
+  }
+
+  async function configurar(regra) {
+    if (salvando || !dono || treinador() !== dono) return;
+    const nome = dono;
+    salvando = true;
+    mostrarRegras(); filtrar();
+    try {
+      await enviar("dex-configurar", { id: regra.id, nome: regra.nome, tipos: regra.tipos, ativa: regra.ativa, revisao: regra.revisao }, nome);
+      if (dono === nome) {
+        regras = await enviar("dex-listar", {}, nome);
+        notas.delete(regra.id);
+        informar(regra.ativa ? `${regra.nome}: melhoria automática ativada.` : `${regra.nome}: melhorias automáticas desativadas. Ative após escolher os bônus.`);
+      }
+    } catch (erro) {
+      informar(erro.message || "Não foi possível salvar. A automação não foi ativada.");
+      if (dono === nome) regras = await enviar("dex-listar", {}, nome).catch(() => []);
+    } finally { salvando = false; mostrarRegras(); filtrar(); }
+  }
+
+  async function carregarCatalogo() {
+    const resposta = await fetch("/pokepedia/pokemon", { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(8000) });
+    if (!resposta.ok) throw new Error("Catálogo indisponível.");
+    const modelo = document.createElement("template");
+    modelo.innerHTML = await resposta.text();
+    const especies = new Map();
+    for (const item of modelo.content.querySelectorAll("article[data-filter-number]")) {
+      const id = item.dataset.filterNumber;
+      const nome = item.querySelector("h2")?.textContent.trim();
+      if (/^[1-9]\d{0,5}$/.test(id) && nome && item.querySelector("a.entry-main")?.getAttribute("href") === `/pokepedia/pokemon/${id}`) {
+        especies.set(id, { id, nome });
+      }
+    }
+    if (!especies.size) throw new Error("Catálogo sem espécies reconhecidas.");
+    return [...especies.values()];
+  }
+
+  function livre() {
+    const foco = campo("painel").getRootNode().activeElement ?? document.activeElement;
+    return podeInteragir() && !document.hidden && document.hasFocus() && performance.now() - ultimaInteracao >= 3000 &&
+      document.querySelector("#game-shell:not([inert]) #party-trainer-name") &&
+      !foco?.matches("input, select, textarea, [contenteditable='true']") &&
+      !document.querySelector("#drawer.open, dialog[open], #connection-screen:not([hidden]), #starter-overlay:not([hidden]), " +
+        "#hunt-map-overlay:not([hidden]), #analyzer-insight:not([hidden]), body.pvp-mode");
+  }
+
+  function lerDetalhe(id) {
+    const detalhe = document.querySelector(`#drawer.open.pokedex-drawer [data-dex-entry="${id}"]`);
+    const inteiro = valor => /^\d+$/.test(valor ?? "") ? Number(valor) : NaN;
+    const pontos = inteiro(detalhe?.querySelector(".dex-point-balance strong")?.textContent.trim());
+    const percentual = no => {
+      const valor = no?.textContent.trim().match(/^\+(\d+(?:[.,]\d+)?)%$/)?.[1];
+      return valor === undefined ? NaN : Number(valor.replace(",", "."));
+    };
+    if (!detalhe || !Number.isSafeInteger(pontos)) return;
+    const bonus = Object.fromEntries(Object.keys(categorias).map(tipo =>
+      [tipo, percentual(detalhe.querySelector(`.dex-upgrade--${tipo} .dex-upgrade-current strong`))]));
+    if (Object.values(bonus).some(valor => !Number.isFinite(valor))) return;
+    return { detalhe, pontos, bonus, percentual };
+  }
+
+  async function melhorar(regra, nome) {
+    if (!livre() || treinador() !== nome) return;
+    const abrir = document.querySelector("#nav-pokedex-register:not(:disabled)");
+    if (!abrir) return;
+    const foco = campo("painel").getRootNode().activeElement ?? document.activeElement;
+    const inicio = interacoes;
+    let dispositivo;
+    let anterior;
+    let reserva;
+    let confirmada = false;
+    let confirmouClique = false;
+    abrir.click();
+    try {
+      dispositivo = document.querySelector("#drawer.open.pokedex-drawer [data-pokedex-device]");
+      if (!dispositivo) return;
+      const filtro = dispositivo.querySelector('[data-dex-filter="all"]');
+      const pesquisa = dispositivo.querySelector("[data-dex-search]");
+      if (!filtro || !pesquisa) return;
+      anterior = { busca: pesquisa.value, filtro: dispositivo.querySelector('[data-dex-filter][aria-pressed="true"]')?.dataset.dexFilter,
+        especie: dispositivo.querySelector('[data-dex-species][aria-pressed="true"]')?.dataset.dexSpecies };
+      if (filtro.getAttribute("aria-pressed") !== "true") filtro.click();
+      if (pesquisa.value) { pesquisa.value = ""; pesquisa.dispatchEvent(new Event("input", { bubbles: true })); }
+      const especie = dispositivo.querySelector(`button[data-dex-species="${regra.id}"][data-dex-unlocked="true"]`);
+      if (!especie) { notas.set(regra.id, "Espécie ainda não registrada na Pokédex do treinador."); return; }
+      especie.click();
+      dispositivo.querySelector('[data-dex-mastery-toggle][aria-expanded="false"]')?.click();
+      const antes = lerDetalhe(regra.id);
+      if (!antes) { notas.set(regra.id, "Aguardando uma leitura completa da Pokédex."); return; }
+      if (!antes.pontos) { notas.set(regra.id, "Sem Pontos Dex livres. Aguardando novos pontos desta espécie."); return; }
+      const escolhas = regra.tipos.map(tipo => {
+        const botao = antes.detalhe.querySelector(`button[data-dex-upgrade="${tipo}"]:not(:disabled):not([aria-disabled="true"])`);
+        const incremento = antes.percentual(botao?.querySelector(".dex-upgrade-increment"));
+        const custo = botao?.querySelector(".dex-upgrade-cost")?.textContent.trim().replace(/\s+/g, " ");
+        return { tipo, botao, incremento, custo };
+      }).filter(item => item.botao && item.incremento > 0 && normalizar(item.custo ?? "") === "1 ponto dex")
+        .sort((a, b) => antes.bonus[a.tipo] - antes.bonus[b.tipo]);
+      const escolha = escolhas[0];
+      if (!escolha) { notas.set(regra.id, "Melhorias selecionadas indisponíveis ou limite atingido no jogo."); return; }
+      reserva = await enviar("dex-reservar", { id: regra.id, revisao: regra.revisao, categoria: escolha.tipo, token: crypto.randomUUID() }, nome);
+      if (!reserva) return;
+      if (dono === nome) { regras = regras.map(item => item.id === reserva.id ? reserva : item); mostrarRegras(); }
+      const atual = (await enviar("dex-listar", {}, nome)).find(item => item.id === regra.id);
+      if (treinador() !== nome || inicio !== interacoes || document.hidden || !document.hasFocus() ||
+          !atual?.ativa || atual.pendente?.token !== reserva.pendente.token || !atual.tipos.includes(escolha.tipo) ||
+          document.querySelector("dialog[open], #connection-screen:not([hidden])") || lerDetalhe(regra.id)?.detalhe !== antes.detalhe ||
+          escolha.botao.matches(":disabled, [aria-disabled='true']") || !escolha.botao.isConnected) return;
+      escolha.botao.click();
+      confirmouClique = true;
+      const prazo = performance.now() + 15_000;
+      while (performance.now() < prazo) {
+        if (treinador() !== nome || interacoes !== inicio || document.hidden ||
+            document.querySelector("#connection-screen:not([hidden]), dialog[open]")) break;
+        const depois = lerDetalhe(regra.id);
+        if (!depois) break;
+        if (Math.abs(depois.bonus[escolha.tipo] - antes.bonus[escolha.tipo] - escolha.incremento) < 0.00001 &&
+            Object.keys(categorias).filter(tipo => tipo !== escolha.tipo).every(tipo => depois.bonus[tipo] === antes.bonus[tipo])) {
+          confirmada = true;
+          notas.set(regra.id, `${categorias[escolha.tipo]} melhorado. ${depois.pontos} Ponto(s) Dex livre(s).`);
+          break;
+        }
+        await esperar(150);
+      }
+    } finally {
+      if (reserva) {
+        await enviar("dex-finalizar", { id: regra.id, token: reserva.pendente.token, confirmada }, nome)
+          .catch(() => informar("Aguardando o banco local para encerrar a confirmação. Nenhum novo ponto será gasto nesta espécie."));
+        if (!confirmada) notas.set(regra.id, confirmouClique
+          ? "Sem confirmação. Automação pausada: confira no jogo antes de reativar." : "Operação cancelada antes do gasto. Reative quando quiser.");
+      }
+      if (inicio === interacoes && dispositivo?.isConnected && dispositivo === document.querySelector("#drawer.open.pokedex-drawer [data-pokedex-device]") &&
+          !document.querySelector("dialog[open]")) {
+        if (anterior) {
+          if (["all", "unlocked", "captured", "points"].includes(anterior.filtro)) {
+            dispositivo.querySelector(`[data-dex-filter="${anterior.filtro}"]`)?.click();
+          }
+          const pesquisa = dispositivo.querySelector("[data-dex-search]");
+          if (pesquisa && pesquisa.value !== anterior.busca) {
+            pesquisa.value = anterior.busca; pesquisa.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          if (/^[1-9]\d*$/.test(anterior.especie ?? "")) dispositivo.querySelector(`[data-dex-species="${anterior.especie}"]`)?.click();
+        }
+        document.querySelector("#drawer-close:not(:disabled)")?.click();
+        if (foco?.isConnected) foco.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  async function atualizar() {
+    if (ocupada || salvando) return;
+    ocupada = true;
+    try {
+      const nome = treinador();
+      if (nome !== dono) { dono = nome; regras = []; notas.clear(); mostrarRegras(); filtrar(); }
+      if (!nome) { informar("Selecione um treinador para configurar a Pokédex."); return; }
+      regras = await enviar("dex-listar", {}, nome);
+      if (treinador() !== nome) return;
+      const antigas = regras.filter(item => item.pendente && Date.now() - item.pendente.data > 20_000);
+      for (const regra of antigas) {
+        await enviar("dex-finalizar", { id: regra.id, token: regra.pendente.token, confirmada: false }, nome);
+      }
+      if (antigas.length) regras = await enviar("dex-listar", {}, nome);
+      mostrarRegras();
+      if (visivel() && !catalogo.length && !carregandoCatalogo) {
+        carregandoCatalogo = cacheDadosHunts("pokedex-pokemon", carregarCatalogo).then(dados => {
+          if (!Array.isArray(dados) || !dados.length || dados.some(item => !/^[1-9]\d{0,5}$/.test(item?.id ?? "") || typeof item.nome !== "string")) {
+            throw new Error("Catálogo inválido.");
+          }
+          catalogo = dados; filtrar();
+        }).catch(() => informar("Catálogo indisponível. A busca tentará novamente ao abrir esta aba."))
+          .finally(() => { carregandoCatalogo = undefined; });
+      }
+      const ativas = regras.filter(item => item.ativa && !item.pendente);
+      if (!ativas.length) { informar(regras.some(item => item.pendente) ? "Aguardando a confirmação da última melhoria." : "Nenhum Pokémon com melhoria automática ativa."); return; }
+      informar(`${ativas.length} Pokémon ativo(s). Somente os bônus marcados recebem Pontos Dex.`);
+      if (!livre()) { informar(`${ativas.length} Pokémon ativo(s). Aguardando o jogo livre e a aba em foco.`); return; }
+      await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
+        if (!lock || !livre() || treinador() !== nome) return;
+        const atuais = (await enviar("dex-listar", {}, nome)).filter(item => item.ativa && !item.pendente);
+        if (!atuais.length) return;
+        const indice = atuais.findIndex(item => item.id === ultimaEspecie);
+        const regra = atuais[(indice + 1) % atuais.length];
+        ultimaEspecie = regra.id;
+        await melhorar(regra, nome);
+      });
+      if (treinador() === nome) { regras = await enviar("dex-listar", {}, nome); mostrarRegras(); }
+    } catch (erro) { informar(erro.message || "Aguardando a Pokédex e o banco local."); }
+    finally { ocupada = false; }
+  }
+
+  busca.addEventListener("input", filtrar);
+  setInterval(() => void atualizar(), 5000);
+  void atualizar();
+  return atualizar;
+}

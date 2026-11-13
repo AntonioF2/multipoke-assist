@@ -1,8 +1,8 @@
 # MultiPoke Assist
 
-O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
+O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.35**
+**Versão 1.5.36**
 
 ## Instalar ou atualizar
 
@@ -75,6 +75,14 @@ Cada hunt recebe uma janela de pelo menos **cinco minutos de coleta pelo relógi
 Mantenha a aba em foco e o jogo livre. Perder o foco ou ficar mais de 45 segundos sem leitura reinicia a janela em andamento. A reposição e as vendas podem continuar entre as leituras, enquanto a troca automática aguarda a rodada. Ao concluir, o Assist retorna à hunt de origem e libera a troca automática. **Parar testes** encerra as próximas ações e conserva as medições já salvas.
 
 Alterar treinador ou integrantes encerra a rodada. Subidas de nível, mudanças de golpes e bônus mantêm as medições associadas ao mesmo time. Os testes não retomam automaticamente após recarregar a página; as medições já concluídas permanecem salvas.
+
+## Melhorias automáticas da Pokédex
+
+Na aba **Pokédex**, busque uma espécie pelo nome ou número e clique em **Adicionar**. Marque **Shiny chance**, **Catch rate** ou **Loot** e clique em **Desativada** para ativar aquele Pokémon. Cada espécie começa desativada e sem bônus marcados. O botão **Ativada** pausa apenas aquela espécie; alterar os bônus também a desativa até uma nova ativação explícita.
+
+A automação usa somente os Pontos Dex livres da própria espécie, pelo botão de melhoria da Pokédex do jogo. Com vários bônus marcados, escolhe o que tiver o menor bônus atual, equilibrando os investimentos; em empate, segue a ordem das opções configuradas. Espécies ativas são consultadas em rodízio. Sem pontos ou com o registro bloqueado, aguarda. Cada melhoria é confirmada pelo aumento do bônus antes de gastar outro ponto. Se a confirmação falhar ou a conexão cair durante o gasto, a espécie é pausada; confira o resultado no jogo antes de reativar. Solicitações pendentes também são protegidas após recarregar a página ou reiniciar o navegador.
+
+As opções e ativações ficam no IndexedDB, separadas por treinador. Funcionam com o painel oculto e com a loja desligada, enquanto o jogo estiver em foco e livre de menus e diálogos; o Assist abre e fecha a Pokédex brevemente para conferir ou aplicar uma melhoria. O bloqueio compartilhado evita sobreposição com a loja, o Grind e as leituras de hunts. A extensão não aplica melhorias em espécies desativadas nem em bônus não marcados. Melhorias são permanentes e os três bônus compartilham os pontos e limites definidos pelo jogo. [Guia da Pokédex](https://multipoke.io/pokepedia/guias/pokedex)
 
 ## Tierlist de Pokémon
 
