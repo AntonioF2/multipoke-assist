@@ -171,6 +171,16 @@
       .dex-regra-cabecalho img { image-rendering: pixelated; flex: none; }
       .dex-regra-cabecalho > div { flex: 1; min-width: 0; }
       .dex-regra-cabecalho strong, .dex-regra-cabecalho small { display: block; overflow-wrap: anywhere; }
+      .dex-progresso { margin-top: 12px; padding: 10px; background: #f3f6fb; border: 1px solid #e6ecf5; border-radius: 9px; }
+      .dex-progresso > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
+      .dex-progresso > div span { color: #49658d; font-weight: 750; white-space: nowrap; }
+      .dex-progresso progress { display: block; width: 100%; height: 8px; margin: 7px 0; border: 0; border-radius: 8px;
+        overflow: hidden; background: #dfe7f2; accent-color: #4c739f; }
+      .dex-progresso progress::-webkit-progress-bar { background: #dfe7f2; border-radius: 8px; }
+      .dex-progresso progress::-webkit-progress-value { background: linear-gradient(90deg, #4d719c, #70a9b5); border-radius: 8px; }
+      .dex-progresso progress::-moz-progress-bar { background: #4d719c; border-radius: 8px; }
+      .dex-progresso small { display: block; font-size: 10px; overflow-wrap: anywhere; }
+      .dex-progresso.sem-dados > div { color: var(--muted); }
       .dex-alternar { border: 1px solid var(--borda); border-radius: 20px; padding: 7px 9px;
         font-size: 11px; color: var(--muted); background: #f2f5f9; }
       .dex-alternar[aria-pressed="true"] { background: #e5f4ec; color: #286b49; border-color: #a7ceba; }

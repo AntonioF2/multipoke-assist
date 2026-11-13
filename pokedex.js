@@ -19,6 +19,46 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
   const informar = mensagem => { if (status.textContent !== mensagem) status.textContent = mensagem; };
   const esperar = tempo => new Promise(resolve => setTimeout(resolve, tempo));
   const enviar = (acao, dados = {}, nome = dono) => enviarDadosHunts(acao, { treinador: nome, ...dados });
+  const quantidade = numero => numero.toLocaleString("pt-BR");
+
+  function criarProgresso(regra) {
+    const bloco = document.createElement("div");
+    bloco.className = "dex-progresso";
+    const p = regra.progresso;
+    const cabecalho = document.createElement("div");
+    const titulo = document.createElement("strong");
+    const percentual = document.createElement("span");
+    const barra = document.createElement("progress");
+    barra.setAttribute("aria-label", `Progresso de ${regra.nome} até o próximo Ponto Dex`);
+    const detalhe = document.createElement("small");
+    const leitura = document.createElement("small");
+    if (!p?.registrado) {
+      bloco.classList.add("sem-dados");
+      titulo.textContent = p ? "Espécie ainda não registrada" : "Aguardando leitura do jogo";
+      percentual.textContent = "—";
+      barra.max = 1; barra.value = 0;
+      barra.setAttribute("aria-valuetext", titulo.textContent);
+      detalhe.textContent = p ? "Registre a espécie no jogo para acompanhar seus abates." : "O progresso será consultado quando o jogo estiver livre e em foco.";
+    } else {
+      const completo = p.proximaMeta === null;
+      const total = completo ? 1 : p.proximaMeta - p.metaAnterior;
+      const atual = completo ? 1 : p.abates - p.metaAnterior;
+      const porcentagem = completo ? 100 : Math.min(99.9, Math.floor(atual * 1000 / total) / 10);
+      titulo.textContent = completo ? "Domínio concluído" : `Ponto Dex ${p.conquistados + 1} de ${p.limite}`;
+      percentual.textContent = `${quantidade(porcentagem)}%${completo ? "" : " da etapa"}`;
+      barra.max = total; barra.value = atual;
+      detalhe.textContent = completo ? `${p.limite} de ${p.limite} pontos conquistados · ${quantidade(p.abates)} abates`
+        : `${quantidade(p.abates)} / ${quantidade(p.proximaMeta)} abates · faltam ${quantidade(p.proximaMeta - p.abates)}`;
+      barra.setAttribute("aria-valuetext", completo ? detalhe.textContent
+        : `${quantidade(atual)} de ${quantidade(total)} abates nesta etapa. ${detalhe.textContent}`);
+      leitura.textContent = `${p.pontosLivres} ${p.pontosLivres === 1 ? "ponto livre" : "pontos livres"} · Leitura às ${new Date(p.data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      bloco.title = "Percentual da etapa entre a meta anterior e o próximo Ponto Dex, conforme a Pokédex do jogo.";
+    }
+    cabecalho.append(titulo, percentual);
+    bloco.append(cabecalho, barra, detalhe);
+    if (leitura.textContent) bloco.append(leitura);
+    return bloco;
+  }
 
   for (const evento of ["pointerdown", "keydown"]) {
     document.addEventListener(evento, event => {
@@ -89,7 +129,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       nota.className = "dex-regra-nota";
       nota.textContent = notas.get(regra.id) || regra.aviso || (regra.ativa
         ? "Aguardando pontos disponíveis para esta espécie." : "Marque os bônus desejados e ative este Pokémon.");
-      cartao.append(cabecalho, opcoes, nota);
+      cartao.append(cabecalho, criarProgresso(regra), opcoes, nota);
       fragmento.append(cartao);
     }
     if (!regras.length) {
@@ -185,7 +225,30 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
     return { detalhe, pontos, bonus, percentual };
   }
 
-  async function melhorar(regra, nome) {
+  function lerProgresso(id) {
+    const detalhe = document.querySelector(`#drawer.open.pokedex-drawer [data-dex-entry="${id}"]`);
+    if (!detalhe) return;
+    const numero = texto => /^(?:\d+|\d{1,3}(?:[.,]\d{3})+)$/.test(texto ?? "") ? Number(texto.replace(/[.,]/g, "")) : NaN;
+    const abates = numero(detalhe.querySelector(".dex-mastery-summary > div:first-child dd")?.textContent.trim());
+    const pontosLivres = numero(detalhe.querySelector(".dex-point-balance strong")?.textContent.trim());
+    const metas = [...detalhe.querySelectorAll("li[data-dex-goal]")].map(no => Number(no.dataset.dexGoal));
+    if (!Number.isSafeInteger(abates) || !Number.isSafeInteger(pontosLivres) || !metas.length ||
+        metas.some((meta, indice) => !Number.isSafeInteger(meta) || meta <= (metas[indice - 1] ?? 0))) return;
+    const conquistados = metas.filter(meta => meta <= abates).length;
+    return { registrado: true, abates, pontosLivres, conquistados, limite: metas.length,
+      metaAnterior: metas[conquistados - 1] ?? 0, proximaMeta: metas[conquistados] ?? null };
+  }
+
+  async function guardarProgresso(regra, nome, progresso = lerProgresso(regra.id)) {
+    if (!progresso || treinador() !== nome) return;
+    const atual = await enviar("dex-progresso", { id: regra.id, progresso }, nome);
+    if (atual && dono === nome) {
+      regras = regras.map(item => item.id === atual.id ? atual : item);
+      mostrarRegras();
+    }
+  }
+
+  async function consultarEspecie(regra, nome, somenteProgresso) {
     if (!livre() || treinador() !== nome) return;
     const abrir = document.querySelector("#nav-pokedex-register:not(:disabled)");
     if (!abrir) return;
@@ -207,10 +270,16 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         especie: dispositivo.querySelector('[data-dex-species][aria-pressed="true"]')?.dataset.dexSpecies };
       if (filtro.getAttribute("aria-pressed") !== "true") filtro.click();
       if (pesquisa.value) { pesquisa.value = ""; pesquisa.dispatchEvent(new Event("input", { bubbles: true })); }
-      const especie = dispositivo.querySelector(`button[data-dex-species="${regra.id}"][data-dex-unlocked="true"]`);
-      if (!especie) { notas.set(regra.id, "Espécie ainda não registrada na Pokédex do treinador."); return; }
+      const especie = dispositivo.querySelector(`button[data-dex-species="${regra.id}"]`);
+      if (!especie) { notas.set(regra.id, "Espécie não disponível na Pokédex do jogo."); return; }
+      if (especie.dataset.dexUnlocked !== "true") {
+        await guardarProgresso(regra, nome, { registrado: false });
+        notas.set(regra.id, "Espécie ainda não registrada na Pokédex do treinador."); return;
+      }
       especie.click();
       dispositivo.querySelector('[data-dex-mastery-toggle][aria-expanded="false"]')?.click();
+      await guardarProgresso(regra, nome);
+      if (somenteProgresso) return;
       const antes = lerDetalhe(regra.id);
       if (!antes) { notas.set(regra.id, "Aguardando uma leitura completa da Pokédex."); return; }
       if (!antes.pontos) { notas.set(regra.id, "Sem Pontos Dex livres. Aguardando novos pontos desta espécie."); return; }
@@ -242,6 +311,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         if (Math.abs(depois.bonus[escolha.tipo] - antes.bonus[escolha.tipo] - escolha.incremento) < 0.00001 &&
             Object.keys(categorias).filter(tipo => tipo !== escolha.tipo).every(tipo => depois.bonus[tipo] === antes.bonus[tipo])) {
           confirmada = true;
+          await guardarProgresso(regra, nome);
           notas.set(regra.id, `${categorias[escolha.tipo]} melhorado. ${depois.pontos} Ponto(s) Dex livre(s).`);
           break;
         }
@@ -286,6 +356,11 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         await enviar("dex-finalizar", { id: regra.id, token: regra.pendente.token, confirmada: false }, nome);
       }
       if (antigas.length) regras = await enviar("dex-listar", {}, nome);
+      if (visivel()) {
+        const id = document.querySelector("#drawer.open.pokedex-drawer [data-dex-entry]")?.dataset.dexEntry;
+        const regra = regras.find(item => item.id === id);
+        if (regra) await guardarProgresso(regra, nome);
+      }
       mostrarRegras();
       if (visivel() && !catalogo.length && !carregandoCatalogo) {
         carregandoCatalogo = cacheDadosHunts("pokedex-pokemon", carregarCatalogo).then(dados => {
@@ -297,17 +372,20 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
           .finally(() => { carregandoCatalogo = undefined; });
       }
       const ativas = regras.filter(item => item.ativa && !item.pendente);
-      if (!ativas.length) { informar(regras.some(item => item.pendente) ? "Aguardando a confirmação da última melhoria." : "Nenhum Pokémon com melhoria automática ativa."); return; }
-      informar(`${ativas.length} Pokémon ativo(s). Somente os bônus marcados recebem Pontos Dex.`);
-      if (!livre()) { informar(`${ativas.length} Pokémon ativo(s). Aguardando o jogo livre e a aba em foco.`); return; }
+      const precisaLer = item => visivel() && (!item.progresso || Date.now() - item.progresso.data >= 30_000);
+      if (!ativas.length && !regras.some(item => !item.pendente && precisaLer(item))) {
+        informar(regras.some(item => item.pendente) ? "Aguardando a confirmação da última melhoria." : "Nenhum Pokémon com melhoria automática ativa."); return;
+      }
+      informar(`${ativas.length} Pokémon ativo(s). Consultando progresso sem alterar espécies desativadas.`);
+      if (!livre()) { informar("Aguardando o jogo livre e a aba em foco para atualizar a Pokédex."); return; }
       await navigator.locks.request("multipoke-auto-loja", { ifAvailable: true }, async lock => {
         if (!lock || !livre() || treinador() !== nome) return;
-        const atuais = (await enviar("dex-listar", {}, nome)).filter(item => item.ativa && !item.pendente);
+        const atuais = (await enviar("dex-listar", {}, nome)).filter(item => !item.pendente && (item.ativa || precisaLer(item)));
         if (!atuais.length) return;
         const indice = atuais.findIndex(item => item.id === ultimaEspecie);
         const regra = atuais[(indice + 1) % atuais.length];
         ultimaEspecie = regra.id;
-        await melhorar(regra, nome);
+        await consultarEspecie(regra, nome, !regra.ativa);
       });
       if (treinador() === nome) { regras = await enviar("dex-listar", {}, nome); mostrarRegras(); }
     } catch (erro) { informar(erro.message || "Aguardando a Pokédex e o banco local."); }

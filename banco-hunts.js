@@ -186,6 +186,27 @@ function configurarPokedex(mensagem) {
   return transacaoHunts(["pokedex"], "readwrite", async transacao => {
     const loja = transacao.objectStore("pokedex");
     const anterior = await pedidoHunts(loja.get([treinador, id]));
+    if (acao === "dex-progresso") {
+      const p = mensagem.progresso;
+      if (!p || typeof p.registrado !== "boolean") throw new Error("Progresso da Pokédex inválido.");
+      let progresso = { registrado: p.registrado, data: Date.now() };
+      if (p.registrado) {
+        const campos = ["abates", "metaAnterior", "conquistados", "limite", "pontosLivres"];
+        if (campos.some(campo => !Number.isSafeInteger(p[campo]) || p[campo] < 0) ||
+            !p.limite || p.limite > 1000 || p.conquistados > p.limite || p.pontosLivres > p.limite || p.metaAnterior > p.abates ||
+            (p.proximaMeta === null ? p.conquistados !== p.limite :
+              !Number.isSafeInteger(p.proximaMeta) || p.proximaMeta <= p.abates || p.conquistados >= p.limite)) {
+          throw new Error("Progresso da Pokédex inválido.");
+        }
+        progresso = { ...progresso, ...Object.fromEntries([...campos, "proximaMeta"].map(campo => [campo, p[campo]])) };
+      }
+      if (!anterior) return null;
+      if (anterior.progresso?.registrado && (!p.registrado || p.abates < anterior.progresso.abates)) return anterior;
+      // Uma leitura não altera a ativação, os bônus autorizados ou a revisão da regra.
+      const regra = { ...anterior, progresso };
+      await pedidoHunts(loja.put(regra));
+      return regra;
+    }
     let regra;
     if (acao === "dex-configurar") {
       const { nome, tipos, ativa, revisao } = mensagem;
@@ -219,7 +240,7 @@ chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
 
   const { acao, chave, valor } = mensagem;
   async function executar() {
-    if (["dex-listar", "dex-configurar", "dex-reservar", "dex-finalizar"].includes(acao)) return configurarPokedex(mensagem);
+    if (["dex-listar", "dex-configurar", "dex-reservar", "dex-finalizar", "dex-progresso"].includes(acao)) return configurarPokedex(mensagem);
     switch (acao) {
       case "ler-cache":
       case "salvar-cache": {
