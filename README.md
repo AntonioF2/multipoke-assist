@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.34**
+**Versão 1.5.35**
 
 ## Instalar ou atualizar
 
@@ -60,7 +60,7 @@ A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segund
 ## Hunts
 
 - **Análise de hunts** compara até 12 áreas regulares por XP e drops por abate. A estimativa considera o nível, os golpes da equipe, os encontros e os bônus de XP ativos. Com uma medição recente compatível, também estima o rendimento por hora.
-- A aba **Grind** escolhe a favorita acessível de maior nível no menu **Caçada**. Se nenhuma favorita estiver disponível, escolhe a área acessível de maior nível. Em empate de nível e preferência, mantém a hunt atual. A troca aguarda o primeiro minuto da caçada, exige a aba em foco e respeita cinco minutos entre tentativas de entrada.
+- A aba **Grind** prioriza sempre a hunt regular acessível de **maior nível** no menu **Caçada**, considerando as regiões disponíveis e as restrições do time. Favoritas só desempatam entre destinos desse mesmo nível. Se a hunt atual já estiver no nível máximo, permanece nela. O Grind só solicita uma entrada para um nível superior ao atual: se a entrada no maior nível falhar, aguarda outra consulta sem escolher uma inferior. O nível e a disponibilidade do destino são conferidos novamente antes de entrar; se o nível atual não puder ser lido, a caçada é mantida. A troca aguarda o primeiro minuto da caçada, exige a aba em foco e respeita cinco minutos entre tentativas de entrada. Essa proteção é do Grind; os testes de análise continuam visitando hunts de outros níveis e retornando à origem.
 
 Com a análise aberta, a troca automática ou os testes ativos, a extensão registra medições em janelas de pelo menos cinco minutos com a mesma formação. A duração vem da diferença entre as leituras do relógio do **Registro da Caçada**, sem um cronômetro próprio de coleta. O histórico e a média das dez amostras mais recentes são consultados por treinador, Pokémon do time e hunt, sem separar por nível, golpes ou bônus. Subir de nível mantém a janela em andamento e as medições anteriores. Os ganhos reais continuam incluindo os boosts e bônus recebidos. Os níveis e golpes ainda entram nas estimativas teóricas de combate.
 

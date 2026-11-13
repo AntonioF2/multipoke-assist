@@ -56,15 +56,17 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
 
   function lerHunts(regiao) {
     const hunts = [];
-    const lista = document.querySelectorAll('#hunt-list .hunt-destination[data-locked="false"][data-team-blocked="false"]');
+    const lista = document.querySelectorAll("#hunt-list .hunt-destination");
     for (const cartao of lista) {
       if (cartao.closest("[data-safari-activity]")) continue;
       const slug = cartao.querySelector("[data-hunt-slug]")?.dataset.huntSlug;
       const nome = cartao.querySelector(".hunt-destination-name-copy")?.textContent.trim();
-      const nivel = cartao.querySelector(".hunt-destination-level")?.textContent.trim().match(/^LV\. ([\d.]+)$/)?.[1];
-      if (!slug || !nome || nivel === undefined) continue;
+      const rotuloNivel = cartao.querySelector(".hunt-destination-level")?.textContent.trim().match(/^LV\. (\d+|\d{1,3}(?:\.\d{3})+)$/)?.[1];
+      const nivel = Number(rotuloNivel?.replaceAll(".", ""));
+      if (!slug || !nome || !Number.isSafeInteger(nivel) || nivel < 0) continue;
       const favorita = Boolean(cartao.querySelector('[data-hunt-favorite][aria-pressed="true"]'));
-      hunts.push({ slug, nome, nivel: Number(nivel.replaceAll(".", "")), favorita, regiao });
+      const acessivel = cartao.dataset.locked === "false" && cartao.dataset.teamBlocked === "false";
+      hunts.push({ slug, nome, nivel, favorita, regiao, acessivel });
     }
     return hunts;
   }
@@ -120,17 +122,22 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
         selecionarRegiao(regiao);
         return lerHunts(regiao);
       });
-      return executar(hunts, hunt => {
+      return executar(hunts.filter(hunt => hunt.acessivel), (hunt, conferir = () => true) => {
         selecionarRegiao(hunt.regiao);
+        const disponivel = () => {
+          const atual = lerHunts(hunt.regiao).find(item => item.slug === hunt.slug);
+          return atual?.acessivel && conferir(atual);
+        };
+        if (!disponivel()) return false;
         const slug = CSS.escape(hunt.slug);
         const seletor = `#hunt-list button[data-hunt-enter="${slug}"]:not(:disabled):not([aria-disabled="true"])`;
         if (!jogo(seletor)) jogo(`#hunt-list button[data-hunt-slug="${slug}"]`)?.click();
         const entrar = menu() && jogo(seletor);
-        if (!entrar) return false;
+        if (!entrar || !disponivel()) return false;
         entrar.click();
         proximaTroca = Date.now() + INTERVALO_TROCA;
         return true;
-      });
+      }, hunts);
     } finally {
       for (const restaurarFiltro of restaurar.reverse()) restaurarFiltro();
       if (menu()) fechar.click();
@@ -139,17 +146,23 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
   }
 
   function procurarHunt(slugAtual) {
-    return comHuntsDisponiveis((hunts, entrar) => {
-      hunts.sort((a, b) => Number(b.favorita) - Number(a.favorita) || b.nivel - a.nivel ||
-        Number(b.slug === slugAtual) - Number(a.slug === slugAtual));
-      for (const hunt of hunts) {
-        if (hunt.slug === slugAtual) {
-          informar(`Você já está em ${hunt.nome} (Lv. ${formatar(hunt.nivel)}), a hunt prioritária.`);
-          return;
-        }
-        if (entrar(hunt)) return hunt;
+    return comHuntsDisponiveis((hunts, entrar, todas) => {
+      const atual = todas.find(hunt => hunt.slug === slugAtual);
+      if (!atual) {
+        informar("Não foi possível confirmar o nível da hunt atual. Mantendo a caçada até a próxima leitura.");
+        return;
       }
-      informar("Aguardando uma hunt regular disponível no menu Caçada.");
+      const maiorNivel = Math.max(atual.nivel, ...hunts.map(hunt => hunt.nivel));
+      if (atual.nivel === maiorNivel) {
+        informar(`Você já está em ${atual.nome} (Lv. ${formatar(atual.nivel)}). Mantendo a hunt de maior nível.`);
+        return;
+      }
+      const candidatas = hunts.filter(hunt => hunt.nivel === maiorNivel)
+        .sort((a, b) => Number(b.favorita) - Number(a.favorita));
+      for (const hunt of candidatas) {
+        if (entrar(hunt, leitura => leitura.nivel === maiorNivel && leitura.nivel > atual.nivel)) return hunt;
+      }
+      informar(`Aguardando entrada em uma hunt de nível ${formatar(maiorNivel)}. Mantendo a caçada atual.`);
     });
   }
 
@@ -173,7 +186,7 @@ function criarTrocaHunts(campo, { formatar, treinador, podeInteragir }) {
   }
 
   function listarParaTeste(confirmarContexto) {
-    return operarTeste(() => comHuntsDisponiveis(hunts => hunts.map(({ regiao, ...hunt }) => hunt)), confirmarContexto);
+    return operarTeste(() => comHuntsDisponiveis(hunts => hunts.map(({ regiao, acessivel, ...hunt }) => hunt)), confirmarContexto);
   }
 
   function entrarParaTeste(slug, confirmarContexto) {

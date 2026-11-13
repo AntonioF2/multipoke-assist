@@ -432,7 +432,7 @@
         <p><small>Tempo medido pelo Registro da Caçada. O histórico pertence ao time e permanece salvo ao fechar o navegador; subir de nível não reinicia a coleta. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
-        <p>Escolhe a favorita disponível de maior nível. Se nenhuma favorita estiver disponível, escolhe a hunt disponível de maior nível.</p>
+        <p>Prioriza sempre a hunt acessível de maior nível. Favoritas só desempatam entre hunts desse mesmo nível. Se a atual já estiver no nível máximo, permanece nela, sem trocar para uma inferior.</p>
         <button id="troca-alternar" type="button">Iniciar troca automática</button>
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
