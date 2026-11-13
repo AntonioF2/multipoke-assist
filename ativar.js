@@ -35,7 +35,7 @@ async function ativar() {
 
   await chrome.scripting.executeScript({
     target: { tabId: aba.id },
-    files: ["avisos.js", "dados-hunts.js", "combate-hunts.js", "analise-hunts.js", "troca-hunts.js", "testes-hunts.js", "tierlist.js", "pokedex.js", "loja.js"],
+    files: ["avisos.js", "dados-hunts.js", "combate-hunts.js", "analise-hunts.js", "troca-hunts.js", "testes-hunts.js", "tierlist.js", "pokedex.js", "lives.js", "loja.js"],
   });
   await chrome.tabs.update(aba.id, { active: true });
   await chrome.windows.update(aba.windowId, { focused: true });

@@ -10,7 +10,7 @@ function pedidoHunts(pedido) {
 
 function abrirBancoHunts() {
   bancoHunts ??= (() => {
-    const pedido = indexedDB.open("multipoke-hunts", 3);
+    const pedido = indexedDB.open("multipoke-hunts", 4);
     pedido.onupgradeneeded = () => {
       const banco = pedido.result;
       if (!banco.objectStoreNames.contains("catalogo")) {
@@ -25,6 +25,7 @@ function abrirBancoHunts() {
       if (!banco.objectStoreNames.contains("pokedex")) {
         banco.createObjectStore("pokedex", { keyPath: ["treinador", "id"] }).createIndex("treinador", "treinador");
       }
+      if (!banco.objectStoreNames.contains("lives")) banco.createObjectStore("lives", { keyPath: "chave" });
     };
     return pedidoHunts(pedido).then(banco => {
       banco.onversionchange = () => {

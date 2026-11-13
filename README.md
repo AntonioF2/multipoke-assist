@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.38**
+**Versão 1.5.39**
 
 ## Instalar ou atualizar
 
@@ -75,6 +75,14 @@ Cada hunt recebe uma janela de pelo menos **cinco minutos de coleta pelo relógi
 Mantenha a aba em foco e o jogo livre. Perder o foco ou ficar mais de 45 segundos sem leitura reinicia a janela em andamento. A reposição e as vendas podem continuar entre as leituras, enquanto a troca automática aguarda a rodada. Ao concluir, o Assist retorna à hunt de origem e libera a troca automática. **Parar testes** encerra as próximas ações e conserva as medições já salvas.
 
 Alterar treinador ou integrantes encerra a rodada. Subidas de nível, mudanças de golpes e bônus mantêm as medições associadas ao mesmo time. Os testes não retomam automaticamente após recarregar a página; as medições já concluídas permanecem salvas.
+
+### Live automática no Grind
+
+Na aba **Grind**, marque **Manter uma live aberta automaticamente** para acompanhar uma transmissão Twitch no player oficial **MultiPoke TV**. A opção começa desmarcada, fica salva por perfil do navegador e funciona independentemente do botão de troca de hunts. Ao encontrar uma sala MultiPoke TV já aberta, a extensão a reaproveita. Quando a live encerra, troca para outra elegível na mesma janela, descarregando a transmissão anterior. Se outra sala válida já estiver aberta, passa a usá-la e fecha somente a sala anterior encerrada.
+
+A checagem periódica usa o catálogo do jogo, aproximadamente a cada minuto, e também reage ao encerramento informado pelo player. Catálogo indisponível ou desatualizado preserva a janela atual; sem outra live Twitch elegível, aguarda. A permissão **alarms** permite consultar periodicamente sem depender do contador da página. A automação abre novas salas enquanto houver uma aba do jogo no mesmo perfil. Janelas privadas, quando a extensão estiver autorizada nelas, usam controle separado.
+
+O bônus depende da **Twitch vinculada e de reprodução real**, validada pelo jogo. A extensão tenta iniciar uma transmissão nova pelo botão oficial uma vez; se o navegador bloquear, clique em **Iniciar transmissão** na sala. Uma pausa manual permanece sob seu controle. O status informa falhas, vínculo pendente e confirmação pelo player, e também identifica o indicador de XP ativo no jogo. A seleção automática usa Twitch; uma sala Kick já aberta é preservada enquanto estiver disponível e mostra a orientação do próprio jogo, pois o bônus dessa plataforma exige atividade manual. Desmarcar a opção interrompe o gerenciamento e mantém a janela atual aberta.
 
 ## Melhorias automáticas da Pokédex
 

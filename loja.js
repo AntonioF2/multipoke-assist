@@ -480,6 +480,13 @@
         <button id="troca-alternar" type="button">Iniciar troca automática</button>
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
+        <section class="bloco-config" aria-labelledby="live-titulo">
+          <h3 id="live-titulo">Live e bônus de XP</h3>
+          <p class="descricao">Acompanhe uma transmissão no player oficial do jogo.</p>
+          <label class="opcao-check"><input id="live-automatica" type="checkbox"> Manter uma live aberta automaticamente</label>
+          <p id="live-status" role="status">Automação de lives desligada.</p>
+          <small>Reaproveita a janela MultiPoke TV aberta e troca de canal quando a live encerra. Para o bônus, vincule sua Twitch e mantenha a reprodução real. O navegador pode pedir um clique em Iniciar transmissão.</small>
+        </section>
       </section>
       <section id="aba-pokedex" aria-labelledby="abrir-pokedex" hidden>
         <div class="dex-apresentacao"><span>PROGRESSÃO · POR ESPÉCIE</span>
@@ -525,6 +532,7 @@
   const trocaHunts = criarTrocaHunts(campo, { formatar, treinador, podeInteragir: () => !ocupada });
   const atualizarAnalise = criarAnaliseHunts(campo, { texto, treinador, numero, formatar, trocaHunts });
   const atualizarTierlist = criarTierlist(campo, { normalizar });
+  const atualizarLives = criarControleLives(campo);
   const atualizarPokedex = criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir: () => !ocupada && !trocaHunts.emTroca() });
   const abas = ["loja", "hunts", "troca", "tierlist", "pokedex"];
   for (const aba of abas) {
@@ -536,6 +544,7 @@
       if (aba === "loja") void atualizarEstoque();
       else if (aba === "tierlist") void atualizarTierlist();
       else if (aba === "pokedex") void atualizarPokedex();
+      else if (aba === "troca") { void atualizarLives(); void atualizarAnalise(); }
       else void atualizarAnalise();
     });
   }
