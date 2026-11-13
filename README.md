@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.37**
+**Versão 1.5.38**
 
 ## Instalar ou atualizar
 
@@ -79,6 +79,8 @@ Alterar treinador ou integrantes encerra a rodada. Subidas de nível, mudanças 
 ## Melhorias automáticas da Pokédex
 
 Na aba **Pokédex**, busque uma espécie pelo nome ou número e clique em **Adicionar**. Marque **Shiny chance**, **Catch rate** ou **Loot** e clique em **Desativada** para ativar aquele Pokémon. Cada espécie começa desativada e sem bônus marcados. O botão **Ativada** pausa apenas aquela espécie; alterar os bônus também a desativa até uma nova ativação explícita.
+
+O botão **Remover** aparece nos Pokémon desativados e exclui sua configuração da lista do Assist. Espere a confirmação de qualquer melhoria pendente antes de remover. Você pode adicionar a espécie novamente pela busca; ela volta desativada e sem bônus marcados. O registro e as melhorias já adquiridas no jogo são preservados.
 
 A automação usa somente os Pontos Dex livres da própria espécie, pelo botão de melhoria da Pokédex do jogo. Com vários bônus marcados, escolhe o que tiver o menor bônus atual, equilibrando os investimentos; em empate, segue a ordem das opções configuradas. Espécies ativas são consultadas em rodízio. Sem pontos ou com o registro bloqueado, aguarda. Cada melhoria é confirmada pelo aumento do bônus antes de gastar outro ponto. Se a confirmação falhar ou a conexão cair durante o gasto, a espécie é pausada; confira o resultado no jogo antes de reativar. Solicitações pendentes também são protegidas após recarregar a página ou reiniciar o navegador.
 

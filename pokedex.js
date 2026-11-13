@@ -130,6 +130,19 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       nota.textContent = notas.get(regra.id) || regra.aviso || (regra.ativa
         ? "Aguardando pontos disponíveis para esta espécie." : "Marque os bônus desejados e ative este Pokémon.");
       cartao.append(cabecalho, criarProgresso(regra), opcoes, nota);
+      if (!regra.ativa) {
+        const rodape = document.createElement("div");
+        rodape.className = "dex-regra-rodape";
+        const remover = document.createElement("button");
+        remover.type = "button";
+        remover.className = "dex-remover";
+        remover.textContent = "Remover";
+        remover.setAttribute("aria-label", `Remover ${regra.nome} da lista de melhorias`);
+        remover.disabled = salvando || Boolean(regra.pendente);
+        remover.addEventListener("click", () => void configurar(regra, "dex-remover"));
+        rodape.append(remover);
+        cartao.append(rodape);
+      }
       fragmento.append(cartao);
     }
     if (!regras.length) {
@@ -166,20 +179,21 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
     resultados.append(nota);
   }
 
-  async function configurar(regra) {
+  async function configurar(regra, acao = "dex-configurar") {
     if (salvando || !dono || treinador() !== dono) return;
     const nome = dono;
     salvando = true;
     mostrarRegras(); filtrar();
     try {
-      await enviar("dex-configurar", { id: regra.id, nome: regra.nome, tipos: regra.tipos, ativa: regra.ativa, revisao: regra.revisao }, nome);
+      await enviar(acao, { id: regra.id, nome: regra.nome, tipos: regra.tipos, ativa: regra.ativa, revisao: regra.revisao }, nome);
       if (dono === nome) {
         regras = await enviar("dex-listar", {}, nome);
         notas.delete(regra.id);
-        informar(regra.ativa ? `${regra.nome}: melhoria automática ativada.` : `${regra.nome}: melhorias automáticas desativadas. Ative após escolher os bônus.`);
+        informar(acao === "dex-remover" ? `${regra.nome} removido da lista. Você pode adicioná-lo novamente pela busca.`
+          : regra.ativa ? `${regra.nome}: melhoria automática ativada.` : `${regra.nome}: melhorias automáticas desativadas. Ative após escolher os bônus.`);
       }
     } catch (erro) {
-      informar(erro.message || "Não foi possível salvar. A automação não foi ativada.");
+      informar(erro.message || "Não foi possível atualizar a lista da Pokédex.");
       if (dono === nome) regras = await enviar("dex-listar", {}, nome).catch(() => []);
     } finally { salvando = false; mostrarRegras(); filtrar(); }
   }

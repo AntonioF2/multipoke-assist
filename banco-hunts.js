@@ -186,6 +186,13 @@ function configurarPokedex(mensagem) {
   return transacaoHunts(["pokedex"], "readwrite", async transacao => {
     const loja = transacao.objectStore("pokedex");
     const anterior = await pedidoHunts(loja.get([treinador, id]));
+    if (acao === "dex-remover") {
+      if (!anterior) return false;
+      if (mensagem.revisao !== anterior.revisao) throw new Error("A configuração mudou em outra aba. Tente novamente.");
+      if (anterior.ativa || anterior.pendente) throw new Error("Desative o Pokémon e aguarde a confirmação de melhorias antes de removê-lo.");
+      await pedidoHunts(loja.delete([treinador, id]));
+      return true;
+    }
     if (acao === "dex-progresso") {
       const p = mensagem.progresso;
       if (!p || typeof p.registrado !== "boolean") throw new Error("Progresso da Pokédex inválido.");
@@ -240,7 +247,7 @@ chrome.runtime.onMessage.addListener((mensagem, remetente, responder) => {
 
   const { acao, chave, valor } = mensagem;
   async function executar() {
-    if (["dex-listar", "dex-configurar", "dex-reservar", "dex-finalizar", "dex-progresso"].includes(acao)) return configurarPokedex(mensagem);
+    if (["dex-listar", "dex-configurar", "dex-reservar", "dex-finalizar", "dex-progresso", "dex-remover"].includes(acao)) return configurarPokedex(mensagem);
     switch (acao) {
       case "ler-cache":
       case "salvar-cache": {

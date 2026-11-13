@@ -184,6 +184,9 @@
       .dex-alternar { border: 1px solid var(--borda); border-radius: 20px; padding: 7px 9px;
         font-size: 11px; color: var(--muted); background: #f2f5f9; }
       .dex-alternar[aria-pressed="true"] { background: #e5f4ec; color: #286b49; border-color: #a7ceba; }
+      .dex-regra-rodape { display: flex; justify-content: flex-end; margin-top: 8px; }
+      .dex-remover { padding: 5px 10px; border: 1px solid #e7cdd3; border-radius: 7px; background: #fff; color: #a04c5a; font-size: 11px; }
+      .dex-remover:hover:not(:disabled) { background: #fff1f3; border-color: #cd9fa9; }
       .dex-regra fieldset { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 10px 0 0; margin: 8px 0 0;
         border-top: 1px solid #edf0f5; }
       .dex-regra legend { font-size: 10px; color: var(--muted); padding: 0 5px 0 0; }
