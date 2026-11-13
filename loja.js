@@ -110,6 +110,20 @@
   try { painel.hidden = localStorage.getItem(chavePainel) === "true"; }
   catch { /* A visibilidade pode ser alterada nesta aba sem armazenamento. */ }
   const interfaceLoja = painel.attachShadow({ mode: "open" });
+  const desenhos = {
+    bola: '<circle cx="12" cy="12" r="9"/><path d="M3 12h6m6 0h6"/><circle cx="12" cy="12" r="3"/>',
+    bolsa: '<path d="M5 8h14v12H5zM9 8V5h6v3M5 13h14m-9 0v3h4v-3"/>',
+    hunt: '<circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6z"/>',
+    grind: '<path d="m3 19 6-10 4 6 3-4 5 8H3ZM9 9V3m0 0h7l-2 2 2 2H9"/>',
+    rank: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>',
+    dex: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="10" cy="8" r="2"/><path d="M14 7h2M8 14h8m-8 3h5"/>',
+    pocao: '<path d="M9 3h6v4l3 5v7a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-7l3-5V3ZM9 7h6M6 14h12"/>',
+    revive: '<path d="m12 3 7 9-7 9-7-9 7-9ZM5 12h14M12 3l-3 9 3 9 3-9-3-9Z"/>',
+    loot: '<path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v9l9 5 9-5V8M12 13v9M8 5l9 5"/>',
+    live: '<rect x="3" y="5" width="18" height="13" rx="2"/><path d="m10 9 5 3-5 3V9Zm-2 12h8m-4-3v3"/>',
+    xp: '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>',
+  };
+  const icone = nome => `<svg class="icone-interface" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${desenhos[nome]}</svg>`;
   interfaceLoja.innerHTML = `
     <style>
       :host { position: fixed; bottom: 12px; left: 12px; z-index: 100000; color-scheme: light;
@@ -117,39 +131,62 @@
         --borda: #dce3ed; --muted: #637189; }
       :host([hidden]) { display: none; }
       *, *::before, *::after { box-sizing: border-box; }
-      #painel { width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
+      #painel { --sinal-loja: #91a0b5; width: max-content; max-width: calc(100vw - 24px); color: var(--azul);
         background: var(--papel); border: 1px solid #263c59; border-radius: 15px;
         box-shadow: 0 16px 48px #111c3545, 0 2px 8px #111c3520; overflow: hidden;
         font: 13px/1.5 system-ui, sans-serif; scrollbar-width: thin; scrollbar-color: #b7c4d7 transparent; }
       #painel[open] { width: 440px; max-height: min(86vh, 800px); overflow: auto; }
       summary, button, select, input[type=checkbox] { cursor: pointer; }
-      #painel > summary { position: sticky; top: 0; z-index: 3; display: flex; height: 74px; list-style: none;
-        background: var(--vermelho); border-bottom: 3px solid var(--amarelo); color: #fff; }
+      #painel > summary { position: sticky; top: 0; z-index: 3; display: flex; height: 78px; list-style: none;
+        background: linear-gradient(110deg, #9c2538, #781f32); border-bottom: 3px solid var(--amarelo); color: #fff; }
       #painel > summary::-webkit-details-marker { display: none; }
       #seta-painel { width: 32px; flex: 0 0 auto; display: grid; place-items: center; }
       #seta-painel:hover { background: #ffffff12; }
       #seta-painel::before { content: ""; width: 7px; height: 7px; border: solid #fff;
         border-width: 0 2px 2px 0; transform: rotate(-45deg); }
       #painel[open] #seta-painel::before { transform: rotate(45deg); }
-      #arrastar { display: flex; align-items: center; flex: 1; gap: 11px; padding: 10px 18px 10px 2px;
+      #arrastar { display: flex; align-items: center; flex: 1; min-width: 0; gap: 11px; padding: 10px 18px 10px 2px;
         cursor: grab; touch-action: none; user-select: none; }
       #arrastar:active { cursor: grabbing; }
       #dragonite { width: 44px; height: 44px; flex: 0 0 auto; background: #fff5d6;
         border: 1px solid #e4b74f; border-radius: 10px; object-fit: contain; image-rendering: pixelated; }
       .marca { display: block; color: #f6d7da; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
       .titulo { display: block; color: #fff; font-size: 21px; font-weight: 800; letter-spacing: -.5px; white-space: nowrap; }
-      #estado { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 9px;
-        background: #65132555; border: 1px solid #ffffff28; border-radius: 20px; font-size: 11px; font-weight: 600; }
-      #estado::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #e8a2ac; }
-      #estado[data-ativa]::before { background: #8ee6a0; box-shadow: 0 0 0 3px #8ee6a018; }
-      #estado[data-aguardando]::before { background: var(--amarelo); box-shadow: none; }
-      #abas { position: sticky; top: 74px; z-index: 2; display: flex; gap: 4px; padding: 10px 14px;
-        background: var(--papel); border-bottom: 1px solid var(--borda); }
-      #abas button { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 8px; padding: 8px 5px;
-        background: transparent; color: var(--muted); font-size: 12px; font-weight: 650; }
+      #painel:has(#estado[data-ativa]) { --sinal-loja: #3fcb95; }
+      #painel:has(#estado[data-aguardando]) { --sinal-loja: #f0bb42; }
+      .pokebola-status { position: relative; min-height: 26px; padding-left: 35px; }
+      .pokebola-status::before { content: ""; position: absolute; left: 0; top: 50%; width: 25px; height: 25px;
+        transform: translateY(-50%); border: 2px solid #233449; border-radius: 50%;
+        background: linear-gradient(to bottom, #d54a58 0 43%, #233449 43% 57%, #f8fafc 57% 100%);
+        box-shadow: inset 0 -2px 0 #23344916, 0 1px 2px #10223618; }
+      .pokebola-status::after { content: ""; position: absolute; left: 9px; top: 50%; width: 7px; height: 7px;
+        transform: translateY(-50%); border-radius: 50%; background: var(--sinal-loja);
+        box-shadow: 0 0 0 2px #f8fafc, 0 0 0 3.5px #233449; transition: background-color .2s; }
+      #estado { display: inline-flex; align-items: center; flex: 0 0 auto; margin-left: auto;
+        padding-right: 0; color: #fff; font-size: 11px; font-weight: 650; white-space: nowrap; }
+      #abas { position: sticky; top: 78px; z-index: 2; display: flex; gap: 4px; padding: 9px 12px;
+        background: #f9fafc; border-bottom: 1px solid var(--borda); }
+      #abas button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 10px; padding: 8px 3px;
+        background: transparent; color: var(--muted); font-size: 11px; font-weight: 650; }
+      .icone-interface { display: inline-block; width: 19px; height: 19px; flex: 0 0 auto; vertical-align: middle; }
       #abas button:hover { background: #e9eef6; }
-      #abas button[aria-pressed="true"] { background: #fff; border-color: var(--borda); color: var(--azul);
-        box-shadow: 0 1px 3px #22375409; }
+      #abas button[aria-pressed="true"] { background: #fff2f2; border-color: #efd7dc; color: #9b293e; }
+      .secao-intro { display: flex; align-items: center; gap: 12px; padding: 2px 0 4px; }
+      .secao-emblema { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto;
+        color: #a72b40; background: #f9e9ec; border: 1px solid #efcfd7; border-radius: 13px; }
+      .secao-emblema .icone-interface { width: 23px; height: 23px; }
+      .sobrelinha { display: block; color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+      .secao-intro h2 { margin: 1px 0 0; font-size: 19px; letter-spacing: -.45px; line-height: 1.3; }
+      .secao-intro p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+      .titulo-bloco { display: flex; align-items: center; gap: 9px; }
+      .titulo-bloco > .icone-interface { width: 27px; height: 27px; padding: 5px; color: #a72b40;
+        background: #fcf0f2; border-radius: 8px; }
+      .rotulo-item { display: flex; align-items: center; gap: 5px; }
+      .rotulo-item .icone-interface { width: 14px; height: 14px; }
+      .rotulo-item[data-item="bola"] { color: #a52e43; }
+      .rotulo-item[data-item="pocao"] { color: #4c718a; }
+      .rotulo-item[data-item="revive"] { color: #8a6b23; }
       #aba-hunts, #aba-troca, #aba-tierlist, #aba-pokedex { padding: 14px; }
       .dex-apresentacao { padding: 17px; border-radius: 12px; color: #fff;
         background: linear-gradient(135deg, #263d60, #3d5480); }
@@ -203,7 +240,8 @@
       #hunt-medicao, small { color: var(--muted); }
       small { font-size: 11px; line-height: 1.6; }
       fieldset { margin: 0; padding: 14px; border: 0; min-width: 0; display: grid; gap: 12px; }
-      .bloco-config { min-width: 0; padding: 14px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; }
+      .bloco-config { min-width: 0; padding: 14px; background: #fff; border: 1px solid var(--borda); border-radius: 12px;
+        box-shadow: 0 2px 5px #22375404; }
       .bloco-config h3 { margin: 0; font-size: 13px; font-weight: 750; }
       .descricao { margin: 3px 0 14px; color: var(--muted); font-size: 11px; }
       #estoque-status { margin: 0; padding: 10px 12px; color: #405b7e; background: #eaf0f9;
@@ -235,7 +273,9 @@
       #regras-pokemon > summary small { display: block; margin-top: 2px; font-weight: 400; }
       #regras-pokemon .conteudo-regras { padding: 14px; }
       .grade-filtros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
-      .opcao-check { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 550; cursor: pointer; }
+      .opcao-check { display: flex; align-items: center; gap: 9px; padding: 10px; border: 1px solid #e0e6ef;
+        border-radius: 9px; background: #f8fafc; font-size: 12px; font-weight: 550; cursor: pointer; }
+      .opcao-check:has(input:checked) { background: #fdf0f2; border-color: #e5bac4; }
       input[type=checkbox] { width: 16px; height: 16px; min-height: 0; margin: 0; flex: 0 0 auto; accent-color: #355985; }
       button, select, input { font: inherit; }
       button { transition: background-color .12s, border-color .12s; }
@@ -268,7 +308,8 @@
       #alternar-captura:hover { background: #e6dbf5; }
       #alternar-captura[aria-pressed="true"] { background: #705096; border-color: #705096; color: #fff; }
       #alternar-captura[aria-pressed="true"]:hover { background: #5f4184; }
-      #mensagem { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+      #mensagem { grid-column: 1 / -1; display: flex; align-items: center; margin: 3px 0 0; color: var(--muted);
+        font-size: 11px; line-height: 1.6; }
       #hunt-exportar, #hunt-importar { padding: 7px 10px; border: 1px solid #cfd8e5; border-radius: 7px;
         background: #fff; color: var(--azul); font-size: 11px; }
       #troca-status { padding: 12px; background: #eaf0f9; border-radius: 9px; color: #405b7e; }
@@ -345,13 +386,27 @@
       .tier-metodo { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--borda); font-size: 11px; color: var(--muted); }
       .tier-metodo > summary { font-weight: 600; }
       .tier-metodo p { margin: 7px 0 0; line-height: 1.6; }
+      .dex-apresentacao, .tier-apresentacao { position: relative; isolation: isolate; overflow: hidden;
+        background: linear-gradient(125deg, #223754, #314d6f); border: 1px solid #3f5777; }
+      .dex-apresentacao::after, .tier-apresentacao::after { content: ""; position: absolute; right: -27px; top: -22px;
+        z-index: -1; width: 126px; height: 126px; border: 14px solid #ffffff08; border-radius: 50%;
+        background: linear-gradient(transparent 45%, #ffffff08 45% 55%, transparent 55%); }
+      .dex-apresentacao > .icone-interface, .tier-apresentacao > .icone-interface { float: right; color: #e9c875;
+        width: 27px; height: 27px; margin: 1px 0 8px 12px; }
+      .hunt-resumo { border-left: 3px solid #8fa2b9; }
+      .resumo-xp { border-left-color: #c99a34; }
+      .resumo-drops { border-left-color: #4b9585; }
+      .hunt-resumo strong { display: flex; align-items: center; gap: 6px; }
+      .hunt-resumo strong .icone-interface { width: 15px; height: 15px; }
+      #live-status { padding: 10px 11px; background: #f3f6fb; border: 1px solid #e2e9f3;
+        border-radius: 8px; color: #49617c; font-size: 11px; }
       @media (max-width: 480px) {
         .linha-reposicao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .linha-reposicao > .campo:first-child { grid-column: 1 / -1; }
         #arrastar { gap: 8px; padding-right: 12px; }
-        #estado { font-size: 10px; padding: 4px 7px; }
+        #estado { font-size: 10px; padding-right: 0; }
       }
-      @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+      @media (prefers-reduced-motion: reduce) { button, .pokebola-status::after { transition: none; } }
       p { margin: 8px 0; }
     </style>
     <details id="painel">
@@ -361,34 +416,36 @@
           <!-- Sprite frontal de Pokémon HeartGold e SoulSilver, via PokéAPI. -->
           <img id="dragonite" src="${chrome.runtime.getURL("dragonite.png")}" alt="" width="48" height="48" draggable="false">
           <span><span class="marca">MULTIPOKE</span><span class="titulo">Assist</span></span>
-          <span id="estado" role="status" title="Estado da reposição e venda automática">Offline</span>
+          <span id="estado" class="pokebola-status" role="status" title="Estado da reposição e venda automática">Offline</span>
         </span>
       </summary>
       <div id="abas" role="group" aria-label="Seções do MultiPoke Assist">
-        <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">Loja</button>
-        <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">Hunts</button>
-        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Grind" title="Grind">Grind</button>
-        <button id="abrir-tierlist" type="button" aria-controls="aba-tierlist" aria-pressed="false">Tierlist</button>
-        <button id="abrir-pokedex" type="button" aria-controls="aba-pokedex" aria-pressed="false">Pokédex</button>
+        <button id="abrir-loja" type="button" aria-controls="aba-loja" aria-pressed="true">${icone("bolsa")}Loja</button>
+        <button id="abrir-hunts" type="button" aria-controls="aba-hunts" aria-pressed="false" aria-label="Análise de hunts" title="Análise de hunts">${icone("hunt")}Hunts</button>
+        <button id="abrir-troca" type="button" aria-controls="aba-troca" aria-pressed="false" aria-label="Grind" title="Grind">${icone("grind")}Grind</button>
+        <button id="abrir-tierlist" type="button" aria-controls="aba-tierlist" aria-pressed="false">${icone("rank")}Tierlist</button>
+        <button id="abrir-pokedex" type="button" aria-controls="aba-pokedex" aria-pressed="false">${icone("dex")}Pokédex</button>
       </div>
       <section id="aba-loja" aria-labelledby="abrir-loja">
       <fieldset id="config">
+        <header class="secao-intro"><span class="secao-emblema">${icone("bolsa")}</span>
+          <div><span class="sobrelinha">SUPRIMENTOS E NEGÓCIOS</span><h2>Loja do treinador</h2><p>Seu inventário pronto para a próxima caçada.</p></div></header>
         <p id="estoque-status">Aguardando a leitura automática do estoque.</p>
         <section class="bloco-config" aria-labelledby="titulo-reposicao">
-          <h3 id="titulo-reposicao">Reposição de suprimentos</h3>
+          <h3 id="titulo-reposicao" class="titulo-bloco">${icone("bolsa")}Reposição de suprimentos</h3>
           <p class="descricao">Escolha os itens e a quantidade de cada compra.</p>
           <div class="linha-reposicao">
-            <label class="campo"><span>Poké Bola</span><select id="bola"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span class="rotulo-item" data-item="bola">${icone("bola")}Poké Bola</span><select id="bola"><option value="">Sem reposição</option></select></label>
             <label class="campo"><span>Estoque mín.</span><input id="bola-min" type="number" min="0" max="10000" value="10"></label>
             <label class="campo"><span>Comprar</span><input id="bola-qtd" type="number" min="1" max="10000" value="50"></label>
           </div>
           <div class="linha-reposicao">
-            <label class="campo"><span>Poção</span><select id="pocao"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span class="rotulo-item" data-item="pocao">${icone("pocao")}Poção</span><select id="pocao"><option value="">Sem reposição</option></select></label>
             <label class="campo"><span>Estoque mín.</span><input id="pocao-min" type="number" min="0" max="10000" value="5"></label>
             <label class="campo"><span>Comprar</span><input id="pocao-qtd" type="number" min="1" max="10000" value="25"></label>
           </div>
           <div class="linha-reposicao">
-            <label class="campo"><span>Revive</span><select id="revive"><option value="">Sem reposição</option></select></label>
+            <label class="campo"><span class="rotulo-item" data-item="revive">${icone("revive")}Revive</span><select id="revive"><option value="">Sem reposição</option></select></label>
             <label class="campo"><span>Estoque mín.</span><input id="revive-min" type="number" min="0" max="10000" value="2"></label>
             <label class="campo"><span>Comprar</span><input id="revive-qtd" type="number" min="1" max="10000" value="5"></label>
           </div>
@@ -398,7 +455,7 @@
           <p class="nota">Os itens escolhidos também são selecionados para uso no Auto Helper.</p>
         </section>
         <section class="bloco-config" aria-labelledby="titulo-loot">
-          <h3 id="titulo-loot">Venda de loot</h3>
+          <h3 id="titulo-loot" class="titulo-bloco">${icone("loot")}Venda de loot</h3>
           <p class="descricao">Defina os itens que podem ser vendidos.</p>
           <label class="campo"><span>Venda automática</span><select id="modo-venda">
             <option value="">Desligada</option>
@@ -414,7 +471,7 @@
           </details>
         </section>
         <details id="regras-pokemon" class="bloco-config regras">
-          <summary><span>Venda de Pokémon<small>Filtros de qualidade e IV</small></span></summary>
+          <summary><span class="titulo-bloco">${icone("bola")}<span>Venda de Pokémon<small>Filtros de qualidade e IV</small></span></span></summary>
           <div class="conteudo-regras">
             <label class="opcao-check"><input id="vender-pokemon" type="checkbox"><span>Ativar venda de Pokémon</span></label>
             <div class="grade-filtros">
@@ -432,14 +489,16 @@
       <div class="acoes-loja">
         <button id="alternar" type="button">Iniciar loja</button>
         <button id="alternar-captura" type="button" aria-label="Autocaptura de Pokémon" aria-pressed="false">Autocaptura desligada</button>
-        <p id="mensagem" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
+        <p id="mensagem" class="pokebola-status" role="status">Configure os itens que deseja comprar, vender ou proteger.</p>
       </div>
       </section>
       <section id="aba-hunts" aria-labelledby="abrir-hunts" hidden>
+        <header class="secao-intro"><span class="secao-emblema">${icone("hunt")}</span>
+          <div><span class="sobrelinha">EXPLORAÇÃO E ANÁLISE</span><h2>Radar de hunts</h2><p>Encontre o melhor destino para sua equipe.</p></div></header>
         <p><strong>Equipe ativa</strong><br><span id="hunt-equipe"></span></p>
         <p id="hunt-atual"></p>
         <section class="bloco-config hunt-testes" aria-labelledby="hunt-testes-titulo">
-          <h3 id="hunt-testes-titulo">Teste real das hunts</h3>
+          <h3 id="hunt-testes-titulo" class="titulo-bloco">${icone("hunt")}Teste real das hunts</h3>
           <p>Cinco minutos pelo relógio do Registro da Caçada em cada hunt acessível, após até um minuto de adaptação de entrada.</p>
           <label class="opcao-check"><input id="hunt-testar-repetir" type="checkbox"><span>Incluir hunts já medidas</span></label>
           <button id="hunt-testar" type="button">Iniciar testes nas hunts</button>
@@ -452,9 +511,9 @@
           </details>
         </section>
         <h3>Estimativas para seu nível</h3>
-        <div class="hunt-resumo"><strong>Melhor estimativa de XP do treinador</strong><span id="hunt-estimativa-xp"></span></div>
+        <div class="hunt-resumo resumo-xp"><strong>${icone("xp")}Melhor estimativa de XP do treinador</strong><span id="hunt-estimativa-xp"></span></div>
         <p><small id="hunt-bonus-xp"></small></p>
-        <div class="hunt-resumo"><strong>Melhor estimativa de drops</strong><span id="hunt-estimativa-drops"></span></div>
+        <div class="hunt-resumo resumo-drops"><strong>${icone("loot")}Melhor estimativa de drops</strong><span id="hunt-estimativa-drops"></span></div>
         <p><small id="hunt-estimativa-status"></small></p>
         <details class="regras">
           <summary>Comparar hunts e golpes</summary>
@@ -462,8 +521,8 @@
         </details>
         <p><small>Ritmo estimado com tipos e golpes de poder fixo. Atributos de referência e encontros da Pokepédia. XP base da PokéAPI.</small></p>
         <h3>Ganhos medidos no jogo</h3>
-        <div class="hunt-resumo"><strong>Melhor XP/h medido</strong><span id="hunt-melhor-xp"></span></div>
-        <div class="hunt-resumo"><strong>Melhor drops/h medido</strong><span id="hunt-melhor-drops"></span></div>
+        <div class="hunt-resumo resumo-xp"><strong>${icone("xp")}Melhor XP/h medido</strong><span id="hunt-melhor-xp"></span></div>
+        <div class="hunt-resumo resumo-drops"><strong>${icone("loot")}Melhor drops/h medido</strong><span id="hunt-melhor-drops"></span></div>
         <p id="hunt-medicao" role="status"></p>
         <details class="regras">
           <summary>Histórico da mesma equipe</summary>
@@ -476,12 +535,14 @@
         <p><small>Tempo medido pelo Registro da Caçada. O histórico pertence ao time e permanece salvo ao fechar o navegador; subir de nível não reinicia a coleta. Drops/h representa o valor dos itens no Registro da Caçada.</small></p>
       </section>
       <section id="aba-troca" aria-labelledby="abrir-troca" hidden>
+        <header class="secao-intro"><span class="secao-emblema">${icone("grind")}</span>
+          <div><span class="sobrelinha">ROTA E EVOLUÇÃO</span><h2>Jornada automática</h2><p>Prepare o caminho para o próximo nível.</p></div></header>
         <p>Prioriza sempre a hunt acessível de maior nível. Favoritas só desempatam entre hunts desse mesmo nível. Se a atual já estiver no nível máximo, permanece nela, sem trocar para uma inferior.</p>
         <button id="troca-alternar" type="button">Iniciar troca automática</button>
         <p id="troca-status" role="status">Troca automática desligada.</p>
         <p><small>Funciona em hunts regulares com a aba do jogo em foco. Aguarda pelo menos 5 minutos entre tentativas de entrada.</small></p>
         <section class="bloco-config" aria-labelledby="live-titulo">
-          <h3 id="live-titulo">Live e bônus de XP</h3>
+          <h3 id="live-titulo" class="titulo-bloco">${icone("live")}Live e bônus de XP</h3>
           <p class="descricao">Acompanhe uma transmissão no player oficial do jogo.</p>
           <label class="opcao-check"><input id="live-automatica" type="checkbox"> Manter uma live aberta automaticamente</label>
           <p id="live-status" role="status">Automação de lives desligada.</p>
@@ -489,7 +550,7 @@
         </section>
       </section>
       <section id="aba-pokedex" aria-labelledby="abrir-pokedex" hidden>
-        <div class="dex-apresentacao"><span>PROGRESSÃO · POR ESPÉCIE</span>
+        <div class="dex-apresentacao">${icone("dex")}<span>PROGRESSÃO · POR ESPÉCIE</span>
           <h3>Domínio da Pokédex</h3><p>Escolha seus Pokémon e autorize os bônus que deseja melhorar.</p></div>
         <small id="dex-treinador">Aguardando um treinador.</small>
         <input id="dex-busca" type="search" placeholder="Buscar Pokémon por nome ou número" aria-label="Buscar Pokémon para melhoria automática" autocomplete="off">
@@ -500,6 +561,7 @@
       </section>
       <section id="aba-tierlist" aria-labelledby="abrir-tierlist" hidden>
         <div class="tier-apresentacao">
+          ${icone("rank")}
           <span>POKEPÉDIA · RANKS OFICIAIS</span>
           <h3>Tierlist de Pokémon</h3>
           <p>Explore os ranks e clique em um Pokémon para abrir sua ficha.</p>

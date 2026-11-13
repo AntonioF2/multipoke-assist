@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.41**
+**Versão 1.5.42**
 
 ## Instalar ou atualizar
 
@@ -32,6 +32,8 @@ A extensão aguarda a confirmação de leitura antes de tentar fechar novamente 
 ## Loja e suprimentos
 
 Use a seta para expandir ou recolher o painel. Arraste pela faixa vermelha para mover o painel ou use as setas do teclado com o cabeçalho em foco. O ícone da extensão mostra ou oculta o painel. A posição e a visibilidade ficam salvas no navegador.
+
+A Poké Bola do cabeçalho e das mensagens acompanha o estado da loja: centro **cinza** quando desligada, **verde** quando ativa e **amarelo** enquanto aguarda condições para operar. O texto permanece ao lado do indicador. As abas e os blocos usam ícones de suprimentos, exploração, ranks e Pokédex para facilitar a navegação.
 
 ### Repor Poké Bolas, poções e revives
 
