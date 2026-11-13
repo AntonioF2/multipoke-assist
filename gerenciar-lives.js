@@ -19,6 +19,7 @@ const gerenciadorLives = (() => {
     estado.documento = null;
     estado.iniciar = true;
     estado.pausaManual = false;
+    estado.apresentada = false;
   };
 
   async function lerEstadoSala(aba) {
@@ -79,6 +80,18 @@ const gerenciadorLives = (() => {
     await chrome.scripting.executeScript({ target: { tabId: aba.id }, files: ["observar-live.js"] }).catch(() => {});
   }
 
+  async function apresentarSala(estado, aba) {
+    const atual = await chrome.tabs.get(aba.id).catch(() => null);
+    if (atual?.id !== estado.abaLive || sala(atual)?.chave !== estado.canal) return;
+    const janela = await chrome.windows.get(atual.windowId);
+    if (estado.apresentada && (janela.state !== "minimized" || !estado.iniciar || estado.pausaManual)) return;
+    // Restaura antes de pedir foco: uma sala oculta pode impedir o início do player.
+    if (janela.state === "minimized") await chrome.windows.update(janela.id, { state: "normal" });
+    if (!atual.active) await chrome.tabs.update(atual.id, { active: true });
+    if (!janela.focused || janela.state === "minimized") await chrome.windows.update(janela.id, { focused: true });
+    estado.apresentada = true;
+  }
+
   async function reconciliar(privado, forcar = false) {
     const estado = await ler(privado);
     if (!estado.ativa) return estado;
@@ -128,6 +141,7 @@ const gerenciadorLives = (() => {
       estado.canal = dadosAtual.chave;
       estado.status = dadosAtual.plataforma === "kick" ? descricoes.unsupported
         : descricoes[estado.reproducao] || "Uma janela MultiPoke TV já está aberta. Nenhuma outra será criada.";
+      await apresentarSala(estado, atual);
       await salvar(estado);
       await instalarMonitor(atual);
       return estado;
@@ -140,6 +154,7 @@ const gerenciadorLives = (() => {
       estado.reproducao = "";
       armarInicio(estado);
       estado.status = "Reaproveitando outra janela MultiPoke TV já aberta.";
+      await apresentarSala(estado, outra);
       await salvar(estado);
       if (atual) {
         const antiga = await chrome.tabs.get(atual.id).catch(() => null);
@@ -176,7 +191,8 @@ const gerenciadorLives = (() => {
     if (preservada) {
       aba = await chrome.tabs.update(preservada.id, { url });
     } else {
-      const janela = await chrome.windows.create({ url, type: "popup", width: 960, height: 760, focused: false, incognito: privado });
+      const janela = await chrome.windows.create({ url, type: "popup", width: 960, height: 760,
+        state: "normal", focused: true, incognito: privado });
       aba = janela.tabs?.[0];
       if (!aba) aba = (await chrome.tabs.query({ windowId: janela.id }))[0];
     }
@@ -185,6 +201,7 @@ const gerenciadorLives = (() => {
     estado.reproducao = "loading";
     armarInicio(estado);
     estado.status = `Abrindo ${proximo.nome} no player oficial. Aguardando reprodução real.`;
+    await apresentarSala(estado, aba);
     await salvar(estado);
     await instalarMonitor(aba);
     return estado;
@@ -216,7 +233,10 @@ const gerenciadorLives = (() => {
       const dentroPrazo = Date.now() - (estado.inicioEm ?? 0) < 60_000;
       const iniciar = estado.iniciar && !estado.pausaManual && dentroPrazo &&
         ["ready", "paused", "blocked"].includes(reproducao) && sala(aba).plataforma === "twitch";
-      if (iniciar) estado.status = "Tentando iniciar a live pelo botão Iniciar transmissão.";
+      if (iniciar) {
+        await apresentarSala(estado, atual);
+        estado.status = "Tentando iniciar a live pelo botão Iniciar transmissão.";
+      }
       if (mudou && ["ended", "offline"].includes(reproducao)) {
         estado.descartados = { ...estado.descartados, [estado.canal]: Date.now() + 120_000 };
       }
