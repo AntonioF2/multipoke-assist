@@ -19,19 +19,11 @@
     const estado = document.querySelector("[data-watch-status]")?.dataset.state;
     if (!estado) return;
     try {
-      const resposta = await chrome.runtime.sendMessage({ tipo: "multipoke:lives", acao: "estado", estado, manual: pausaManual, ciclo, manualEm });
+      const resposta = await chrome.runtime.sendMessage({ tipo: "multipoke:lives", acao: "estado", estado, manual: pausaManual, ciclo, manualEm, tentativas });
       if (!resposta?.ok) return;
       const controle = resposta.resultado;
+      if (!controle?.ciclo) return;
       if (controle.ciclo !== ciclo) { ciclo = controle.ciclo; tentativas = 0; ultimaTentativa = -Infinity; pausaManual = false; }
-      if (controle.player && !pausaManual) {
-        for (const frame of document.querySelectorAll("#twitch-player iframe")) {
-          try {
-            if (new URL(frame.src).origin === "https://player.twitch.tv") {
-              frame.contentWindow?.postMessage({ tipo: "multipoke:iniciar-player" }, "https://player.twitch.tv");
-            }
-          } catch { /* Outro conteúdo do player não faz parte desta automação. */ }
-        }
-      }
       if (!controle.iniciar || pausaManual || tentativas >= 2 ||
           !["ready", "paused", "blocked"].includes(estado) || document.querySelector("[data-watch-status]")?.dataset.state !== estado) return;
       if (performance.now() - ultimaTentativa < 1500) return agendar(1500);
@@ -39,7 +31,7 @@
       if (!iniciar || iniciar.checkVisibility?.({ visibilityProperty: true }) === false) return agendar(1000);
       tentativas++;
       ultimaTentativa = performance.now();
-      // Aciona apenas o player oficial. Os eventos de reprodução e o bônus
+      // Aciona o botão Iniciar transmissão. Os eventos de reprodução e o bônus
       // são produzidos pelo jogo, nunca simulados pela extensão.
       iniciar.click();
       agendar(1500);
@@ -51,8 +43,8 @@
     timer = setTimeout(() => void informar(), espera);
   }
   new MutationObserver(mudancas => {
-    if (mudancas.some(mudanca => mudanca.target.matches?.("[data-watch-status], [data-watch-start], #twitch-player") ||
-        [...mudanca.addedNodes].some(no => no.matches?.("[data-watch-status], iframe") || no.querySelector?.("[data-watch-status], #twitch-player iframe")))) agendar();
+    if (mudancas.some(mudanca => mudanca.target.matches?.("[data-watch-status], [data-watch-start]") ||
+        [...mudanca.addedNodes].some(no => no.matches?.("[data-watch-status], [data-watch-start]") || no.querySelector?.("[data-watch-status], [data-watch-start]")))) agendar();
   }).observe(raiz, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state", "hidden", "disabled"] });
   document.addEventListener("click", event => {
     if (!event.isTrusted) return;

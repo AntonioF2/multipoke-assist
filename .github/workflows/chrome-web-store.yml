@@ -42,7 +42,6 @@ jobs:
           node --check lives.js
           node --check gerenciar-lives.js
           node --check observar-live.js
-          node --check player-live.js
           node --check loja.js
           node --check ativar.js
           node --check barra.js
