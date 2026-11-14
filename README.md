@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.44**
+**Versão 1.5.45**
 
 ## Instalar ou atualizar
 
@@ -90,9 +90,11 @@ A checagem periódica usa o catálogo do jogo, aproximadamente a cada minuto, e 
 
 A janela da live abre em estado normal e em primeiro plano. Ao iniciar ou trocar a transmissão, uma janela reaproveitada que estiver minimizada é restaurada e a aba da live fica ativa. As consultas periódicas preservam o foco depois dessa preparação, e não alteram uma pausa manual.
 
-O bônus depende da **Twitch vinculada e de reprodução real**, validada pelo jogo. A extensão aguarda o botão **Iniciar transmissão** ficar visível e habilitado na janela MultiPoke TV e o aciona, com até duas tentativas por abertura, troca de canal ou reativação da opção. Um estado inicial de pausado não cancela essa preparação. O próprio player cuida da reprodução e do áudio, e o jogo confirma o bônus. Recarregue também uma janela de live que já estava aberta ao atualizar a extensão.
+O bônus depende da **Twitch vinculada e de reprodução real**, validada pelo jogo. A extensão aguarda o botão **Iniciar transmissão** ou **Retomar transmissão** ficar visível e habilitado na janela MultiPoke TV e o aciona, com até duas tentativas por ciclo. Um estado inicial de pausado não cancela essa preparação. O próprio player cuida da reprodução e do áudio, e o jogo confirma o bônus. Recarregue também uma janela de live que já estava aberta ao atualizar a extensão.
 
-Uma pausa manual posterior permanece sob seu controle. Desligar e ligar a opção novamente autoriza uma nova tentativa. Se o navegador ainda impedir a reprodução, clique em **Iniciar transmissão** na sala. O status informa falhas, vínculo pendente e confirmação pelo player, e também identifica o indicador de XP ativo no jogo. A seleção automática usa Twitch; uma sala Kick já aberta é preservada enquanto estiver disponível e mostra a orientação do próprio jogo, pois o bônus dessa plataforma exige atividade manual. Desmarcar a opção interrompe o gerenciamento e mantém a janela atual aberta.
+A monitoração continua depois da reprodução começar. Se a transmissão pausar automaticamente, a extensão restaura a janela e usa **Retomar transmissão**. As tentativas de recuperação repetidas ficam espaçadas em pelo menos 30 segundos. Se o player continuar sem confirmar o bônus por dois minutos, procura outro canal Twitch elegível, priorizando salas já abertas com bônus ativo ou em validação. O canal com falha fica fora da seleção por cinco minutos. Sem alternativa, mantém a sala atual e as tentativas de retomada. As verificações da página ocorrem a cada cinco segundos; as consultas do jogo e o alarme da extensão também verificam o estado, inclusive quando os temporizadores de uma janela minimizada atrasam.
+
+O botão oficial **Pausar transmissão** suspende a retomada automática naquela sala. Você pode retomar pelo botão oficial ou desligar e ligar a opção para autorizar uma nova tentativa. Falta de vínculo com a Twitch e a orientação de atividade manual da Kick não causam rodízio de canais. Se o navegador ainda impedir a reprodução, use o botão da sala. O status informa falhas, vínculo pendente e confirmação pelo player, e também identifica o indicador de XP ativo no jogo. Desmarcar a opção interrompe o gerenciamento e mantém a janela atual aberta.
 
 ## Melhorias automáticas da Pokédex
 

@@ -1,5 +1,10 @@
 const gerenciadorLives = (() => {
   const ALARME = "multipoke-lives";
+  const INTERVALO_RETOMADA = 30_000;
+  const PRAZO_BONUS = 120_000;
+  const INTERVALO_CANAL = 300_000;
+  const RETOMAVEIS = ["ready", "paused", "blocked"];
+  const FALHAS = [...RETOMAVEIS, "loading", "validating", "error"];
   let fila = Promise.resolve();
   const serializar = executar => {
     const pedido = fila.catch(() => {}).then(executar);
@@ -13,20 +18,65 @@ const gerenciadorLives = (() => {
   const salvar = estado => transacaoHunts(["lives"], "readwrite", transacao =>
     pedidoHunts(transacao.objectStore("lives").put(estado)));
   const jogo = aba => /^https:\/\/multipoke\.io\/jogar\/?(?:[?#].*)?$/.test(aba?.pendingUrl || aba?.url || "");
-  const armarInicio = estado => {
+  const armarInicio = (estado, recuperacao = false) => {
     estado.ciclo = crypto.randomUUID();
     estado.inicioEm = Date.now();
     estado.documento = null;
     estado.iniciar = true;
     estado.pausaManual = false;
     estado.apresentada = false;
+    estado.tentativas = 0;
+    estado.retomadaPendente = false;
+    if (recuperacao) estado.ultimaRecuperacao = Date.now();
+    else { estado.ultimaRecuperacao = 0; estado.falhaEm = null; }
   };
 
   async function lerEstadoSala(aba) {
     const [leitura] = await chrome.scripting.executeScript({ target: { tabId: aba.id, frameIds: [0] },
-      func: () => document.querySelector("[data-watch-status]")?.dataset.state ?? "" }).catch(() => []);
+      func: () => ({ estado: document.querySelector("[data-watch-status]")?.dataset.state ?? "",
+        manualEm: Number(document.documentElement.dataset.multipokeLivePausaManual ?? 0) }) }).catch(() => []);
     return leitura;
   }
+
+  function registrarReproducao(estado, leitura, dados = {}) {
+    const agora = Date.now();
+    const reproducao = leitura.result.estado;
+    if (!/^[a-z-]{1,30}$/.test(reproducao)) return;
+    if (estado.documento && estado.documento !== leitura.documentId) armarInicio(estado);
+    estado.documento = leitura.documentId;
+    const anterior = estado.reproducao;
+    estado.reproducao = reproducao;
+    if (descricoes[reproducao]) estado.status = descricoes[reproducao];
+    const manual = dados.manual === true && (dados.ciclo === estado.ciclo ||
+      Number.isSafeInteger(dados.manualEm) && dados.manualEm >= estado.inicioEm);
+    if (manual || Number.isSafeInteger(leitura.result.manualEm) && leitura.result.manualEm >= estado.inicioEm) {
+      estado.pausaManual = true; estado.iniciar = false;
+    }
+    if (["active", "validating"].includes(reproducao) && !manual && !leitura.result.manualEm) estado.pausaManual = false;
+    if (dados.ciclo === estado.ciclo && Number.isSafeInteger(dados.tentativas) && dados.tentativas >= 0 && dados.tentativas <= 2) {
+      estado.tentativas = Math.max(estado.tentativas ?? 0, dados.tentativas);
+    }
+    if (["active", "guest-playing"].includes(reproducao)) {
+      estado.iniciar = false; estado.falhaEm = null; estado.retomadaPendente = false;
+    } else if (reproducao === "validating") estado.iniciar = false;
+    if (estado.pausaManual || !FALHAS.includes(reproducao)) estado.falhaEm = null;
+    else estado.falhaEm ??= agora;
+    if (reproducao === "paused" && ["active", "validating"].includes(anterior)) estado.retomadaPendente = true;
+    if ((estado.tentativas ?? 0) >= 2 || agora - (estado.inicioEm ?? 0) >= 60_000) estado.iniciar = false;
+    if (!estado.pausaManual && estado.canal?.startsWith("twitch:") && RETOMAVEIS.includes(reproducao) && !estado.iniciar &&
+        agora - (estado.ultimaRecuperacao ?? 0) >= INTERVALO_RETOMADA &&
+        (estado.retomadaPendente || agora - (estado.inicioEm ?? 0) >= INTERVALO_RETOMADA)) {
+      armarInicio(estado, true);
+      estado.documento = leitura.documentId;
+    }
+    if (estado.pausaManual) estado.status = "Transmissão pausada por você. A retomada automática está suspensa nesta sala.";
+    if (anterior !== reproducao && ["ended", "offline"].includes(reproducao)) {
+      estado.descartados = { ...estado.descartados, [estado.canal]: agora + INTERVALO_CANAL };
+    }
+  }
+
+  const falhaPersistente = estado => !estado.pausaManual && estado.canal?.startsWith("twitch:") &&
+    FALHAS.includes(estado.reproducao) && Number.isFinite(estado.falhaEm) && Date.now() - estado.falhaEm >= PRAZO_BONUS;
 
   function sala(aba) {
     try {
@@ -97,8 +147,7 @@ const gerenciadorLives = (() => {
     if (!estado.ativa) return estado;
     const anterior = estado.abaLive ? await chrome.tabs.get(estado.abaLive).catch(() => null) : null;
     const perdeuJanela = Boolean(estado.abaLive) && !sala(anterior);
-    if (!forcar && estado.ciclo && !perdeuJanela && !estado.aguardaJogo && Date.now() - (estado.consulta ?? 0) < 60_000) return estado;
-    estado.consulta = Date.now();
+    const consultarAgora = forcar || !estado.ciclo || perdeuJanela || estado.aguardaJogo || Date.now() - (estado.consulta ?? 0) >= 60_000;
     const abas = (await chrome.tabs.query({ url: "https://multipoke.io/*" })).filter(aba => Boolean(aba.incognito) === privado);
     const jogos = abas.filter(jogo);
     const origem = jogos.find(aba => aba.id === estado.abaJogo) ?? jogos[0];
@@ -122,38 +171,55 @@ const gerenciadorLives = (() => {
       estado.canal = sala(atual).chave; estado.reproducao = ""; armarInicio(estado);
     }
     if (!estado.ciclo) armarInicio(estado);
+    const reproducaoAnterior = estado.reproducao;
+    if (atual) {
+      const leitura = await lerEstadoSala(atual);
+      if (leitura?.result?.estado) registrarReproducao(estado, leitura);
+      await apresentarSala(estado, atual);
+      await salvar(estado);
+      await instalarMonitor(atual);
+    }
+    const terminou = ["ended", "offline"].includes(estado.reproducao);
+    const falhou = falhaPersistente(estado);
+    if (!consultarAgora && atual && !(terminou && reproducaoAnterior !== estado.reproducao)) return estado;
+    estado.consulta = Date.now();
     let canais;
     try {
       const [resultado] = await chrome.scripting.executeScript({ target: { tabId: origem.id }, func: consultarCatalogo });
       canais = resultado?.result;
     } catch { canais = null; }
     if (!Array.isArray(canais)) {
-      estado.status = "Não foi possível confirmar as lives ao vivo. Aguardando nova consulta sem alterar janelas.";
+      estado.status = "Não foi possível confirmar as lives ao vivo. Aguardando nova consulta e mantendo o canal atual.";
       await salvar(estado); return estado;
     }
     const descartados = Object.fromEntries(Object.entries(estado.descartados ?? {}).filter(([, prazo]) => prazo > Date.now()));
     estado.descartados = descartados;
     const dadosAtual = sala(atual);
-    const terminou = estado.canal === dadosAtual?.chave && ["ended", "offline"].includes(estado.reproducao);
+    if (falhou) descartados[estado.canal] = Date.now() + INTERVALO_CANAL;
     const disponivel = dados => dados && canais.some(item => `${item.plataforma}:${item.canal}` === dados.chave);
-    if (atual && disponivel(dadosAtual) && !terminou) {
+    if (atual && disponivel(dadosAtual) && !terminou && !falhou) {
       estado.abaLive = atual.id;
       estado.canal = dadosAtual.chave;
-      estado.status = dadosAtual.plataforma === "kick" ? descricoes.unsupported
+      estado.status = estado.pausaManual ? "Transmissão pausada por você. A retomada automática está suspensa nesta sala."
+        : dadosAtual.plataforma === "kick" ? descricoes.unsupported
         : descricoes[estado.reproducao] || "Uma janela MultiPoke TV já está aberta. Nenhuma outra será criada.";
-      await apresentarSala(estado, atual);
       await salvar(estado);
-      await instalarMonitor(atual);
       return estado;
     }
     const elegiveis = canais.filter(item => item.plataforma === "twitch" && !descartados[`twitch:${item.canal}`]);
-    const outra = salas.find(aba => aba.id !== atual?.id && elegiveis.some(item => sala(aba)?.chave === `twitch:${item.canal}`));
+    const candidatas = salas.filter(aba => aba.id !== atual?.id && elegiveis.some(item => sala(aba)?.chave === `twitch:${item.canal}`));
+    const leituras = await Promise.all(candidatas.map(async aba => ({ aba, leitura: await lerEstadoSala(aba) })));
+    const prioridade = { active: 4, validating: 3, ready: 2, paused: 1, blocked: 1 };
+    const outra = leituras.filter(item => !item.leitura?.result?.manualEm &&
+      (falhou ? prioridade[item.leitura?.result?.estado] : !["ended", "offline"].includes(item.leitura?.result?.estado)))
+      .sort((a, b) => (prioridade[b.leitura?.result?.estado] ?? 0) - (prioridade[a.leitura?.result?.estado] ?? 0))[0]?.aba;
     if (outra) {
       estado.abaLive = outra.id;
       estado.canal = sala(outra).chave;
       estado.reproducao = "";
       armarInicio(estado);
-      estado.status = "Reaproveitando outra janela MultiPoke TV já aberta.";
+      estado.status = falhou ? "Trocando para outra sala já aberta após falha persistente do bônus."
+        : "Reaproveitando outra janela MultiPoke TV já aberta.";
       await apresentarSala(estado, outra);
       await salvar(estado);
       if (atual) {
@@ -163,9 +229,11 @@ const gerenciadorLives = (() => {
       await instalarMonitor(outra);
       return estado;
     }
-    const proximo = elegiveis[0];
+    // Uma sala não adotada (por exemplo, pausada manualmente) não deve ser duplicada.
+    const proximo = elegiveis.find(item => !candidatas.some(aba => sala(aba)?.chave === `twitch:${item.canal}`));
     if (!proximo) {
-      estado.status = "Nenhuma live Twitch elegível disponível. Aguardando uma nova transmissão.";
+      estado.status = falhou ? "O bônus não foi confirmado. Sem outro canal elegível; mantendo a sala e as tentativas de retomada."
+        : "Nenhuma live Twitch elegível disponível. Aguardando uma nova transmissão.";
       await salvar(estado); return estado;
     }
     const url = `https://multipoke.io/live-watch.html?channel=${encodeURIComponent(proximo.canal)}`;
@@ -217,31 +285,23 @@ const gerenciadorLives = (() => {
       const atual = await chrome.tabs.get(aba.id).catch(() => null);
       if (sala(atual)?.chave !== sala(aba).chave) return { iniciar: false };
       const leitura = await lerEstadoSala(atual);
-      if (!leitura || (remetente.documentId && leitura.documentId !== remetente.documentId) || leitura.result !== dados.estado) return { iniciar: false };
-      if (estado.documento && estado.documento !== remetente.documentId) armarInicio(estado);
-      estado.documento = remetente.documentId ?? null;
-      const reproducao = typeof dados.estado === "string" && /^[a-z-]{1,30}$/.test(dados.estado) ? dados.estado : "";
-      const mudou = estado.reproducao !== reproducao;
-      estado.reproducao = reproducao;
-      if (descricoes[reproducao]) estado.status = descricoes[reproducao];
-      if (dados.manual === true && (dados.ciclo === estado.ciclo || Number.isSafeInteger(dados.manualEm) && dados.manualEm >= estado.inicioEm)) {
-        estado.pausaManual = true; estado.iniciar = false;
-      }
-      if (["validating", "active", "guest-playing"].includes(reproducao) || dados.ciclo === estado.ciclo && dados.tentativas === 2) {
-        estado.iniciar = false;
-      }
+      if (!leitura || (remetente.documentId && leitura.documentId !== remetente.documentId) || leitura.result.estado !== dados.estado) return { iniciar: false };
+      const mudou = estado.reproducao !== dados.estado;
+      registrarReproducao(estado, leitura, dados);
       const dentroPrazo = Date.now() - (estado.inicioEm ?? 0) < 60_000;
       const iniciar = estado.iniciar && !estado.pausaManual && dentroPrazo &&
-        ["ready", "paused", "blocked"].includes(reproducao) && sala(aba).plataforma === "twitch";
+        RETOMAVEIS.includes(estado.reproducao) && sala(aba).plataforma === "twitch";
       if (iniciar) {
         await apresentarSala(estado, atual);
-        estado.status = "Tentando iniciar a live pelo botão Iniciar transmissão.";
-      }
-      if (mudou && ["ended", "offline"].includes(reproducao)) {
-        estado.descartados = { ...estado.descartados, [estado.canal]: Date.now() + 120_000 };
+        estado.status = estado.reproducao === "paused" ? "Restaurando a live pelo botão Retomar transmissão."
+          : "Tentando iniciar a live pelo botão Iniciar transmissão.";
       }
       await salvar(estado);
-      if (mudou && ["ended", "offline"].includes(reproducao)) await reconciliar(privado, true);
+      if (mudou && ["ended", "offline"].includes(estado.reproducao) ||
+          falhaPersistente(estado) && Date.now() - (estado.consulta ?? 0) >= 60_000) {
+        const depois = await reconciliar(privado, true);
+        if (depois.abaLive !== aba.id || depois.canal !== estado.canal || depois.ciclo !== estado.ciclo) return { iniciar: false };
+      }
       return { iniciar, ciclo: estado.ciclo };
     }
     if (!jogo(aba)) throw new Error("Abra o jogo para configurar as lives.");

@@ -48,9 +48,15 @@
   }).observe(raiz, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state", "hidden", "disabled"] });
   document.addEventListener("click", event => {
     if (!event.isTrusted) return;
-    if (event.target.closest?.("button[data-watch-stop]")) { pausaManual = true; manualEm = Date.now(); agendar(); }
-    else if (event.target.closest?.("button[data-watch-start]")) { pausaManual = false; agendar(); }
+    if (event.target.closest?.("button[data-watch-stop]")) {
+      pausaManual = true; manualEm = Date.now(); raiz.dataset.multipokeLivePausaManual = String(manualEm); agendar();
+    } else if (event.target.closest?.("button[data-watch-start]")) {
+      pausaManual = false; delete raiz.dataset.multipokeLivePausaManual; agendar();
+    }
   }, true);
   document.addEventListener(evento, () => agendar());
+  document.addEventListener("visibilitychange", () => agendar());
+  window.addEventListener("focus", () => agendar());
+  setInterval(() => agendar(), 5000);
   agendar();
 })();
