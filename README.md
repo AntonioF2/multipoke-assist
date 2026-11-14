@@ -2,7 +2,7 @@
 
 O **MultiPoke Assist** reúne capturas automáticas, reposição de suprimentos, venda de loot e Pokémon, análise e troca de hunts, melhorias da Pokédex e tierlist em uma extensão para o Chrome. Use o painel dentro do MultiPoke Idle para acessar as funções.
 
-**Versão 1.5.45**
+**Versão 1.5.46**
 
 ## Instalar ou atualizar
 
@@ -49,9 +49,11 @@ Em **Venda automática**, escolha **Somente marcados para venda** para vender ap
 
 Em **Permissões de venda por item**, busque por nome ou ID e use **Permitir venda** ou **Bloquear venda**. O bloqueio vale em qualquer modo. Antes de vender, o MultiPoke Assist limpa a seleção anterior de loot e confere os itens do lote.
 
-A leitura prioriza os objetos do catálogo enviados pelo jogo, com ID, preço de NPC e restrições de venda. O estoque e a quantidade vêm dos controles numéricos do inventário, e as permissões são associadas ao ID para preservar os bloqueios mesmo quando o nome exibido muda. A extensão observa somente os metadados do catálogo na conexão existente, sem abrir conexões adicionais ou enviar comandos por ela. Recarregue o jogo após atualizar para receber esses dados desde o início.
+A leitura acompanha os metadados de catálogo e inventário enviados pelo jogo, inclusive mensagens agrupadas e atualizações incrementais. O preço do inventário tem prioridade sobre o preço de referência do catálogo, como na loja nativa. Os controles reais de venda também são conferidos: uma pilha oferecida pela Loja NPC pode ser reconhecida mesmo que esteja ausente do catálogo recebido. O estoque e a quantidade vêm dos controles numéricos, e as permissões são associadas ao ID para preservar bloqueios mesmo quando o nome exibido muda. Não há conexões adicionais ou comandos enviados pela conexão observada. Recarregue o jogo após atualizar para receber os dados desde o início.
 
 Se os objetos não estiverem disponíveis, a leitura alternativa reconhece o preço resumido e a descrição de venda à Loja NPC da Pokepédia. A disponibilidade de obtenção do item não bloqueia a venda de estoque já existente. Somente loots com preço de NPC válido e listados nos controles de venda da loja entram no lote; itens sem preço continuam indisponíveis.
+
+Quando nenhum item puder entrar no lote, o status informa bloqueios, preços a partir de 10.000 sem autorização ou dados que ainda não puderam ser validados. A leitura não desmarca proteções individuais nem ativa um modo de venda que estava desligado.
 
 ### Vender Pokémon
 

@@ -677,8 +677,9 @@
       itens.set(chaveLoot(`id:${id}`, nome), { id, nome, preco, vendavel, ...objeto });
     }
     if (!itens.size) throw new Error("A Pokepédia não apresentou o catálogo de loot esperado.");
-    // Um catálogo estruturado recebido durante o fetch tem prioridade.
-    catalogo ??= itens;
+    // Completa entradas ausentes sem substituir o preço já conferido na loja ou nos objetos.
+    catalogo ??= new Map();
+    for (const [chave, item] of itens) if (!catalogo.has(chave)) catalogo.set(chave, item);
   }
 
   const chaveLoot = (id, nome) => /^id:\d+$/.test(id) ? id : `${id}:${normalizar(nome)}`;
@@ -690,12 +691,15 @@
     if (typeof event.detail !== "string" || event.detail.length > 2_000_000) return;
     let dados;
     try { dados = JSON.parse(event.detail); } catch { return; }
-    if (!Array.isArray(dados) || !dados.length || dados.length > 10000 || !dados.every(item =>
+    if (!Array.isArray(dados) || dados.length > 10000 || !dados.every(item =>
       inteiro(item?.id, 1, Number.MAX_SAFE_INTEGER) && typeof item.nome === "string" && item.nome.length > 0 && item.nome.length <= 200 &&
-      inteiro(item.preco, 0, Number.MAX_SAFE_INTEGER) && typeof item.vendavel === "boolean" && (!item.vendavel || item.preco > 0)) ||
+      inteiro(item.preco, 0, Number.MAX_SAFE_INTEGER) && typeof item.vendavel === "boolean" && (!item.vendavel || item.preco > 0) &&
+      (item.bloqueado === undefined || typeof item.bloqueado === "boolean")) ||
       new Set(dados.map(item => item.id)).size !== dados.length) return;
     objetosLoot.clear();
-    for (const item of dados) objetosLoot.set(`id:${item.id}`, { ...item, id: String(item.id) });
+    for (const item of dados) objetosLoot.set(`id:${item.id}`, { id: String(item.id), nome: item.nome, preco: item.preco,
+      vendavel: item.vendavel, bloqueado: item.bloqueado ?? (!item.vendavel && item.preco > 0) });
+    if (!dados.length) return;
     catalogo ??= new Map();
     for (const [chave, item] of objetosLoot) {
       // Preço zero em suprimentos e moedas não transforma esses itens em loot.
@@ -761,15 +765,19 @@
     const id = caixa.dataset.lootSelect;
     const nome = texto(linha, ".loot-identity strong");
     const objeto = objetosLoot.get(id);
-    const preco = objeto?.preco ?? numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
+    const precoLoja = numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
+    const preco = Number.isFinite(precoLoja) ? precoLoja : objeto?.preco;
     const controle = linha.querySelector("input[data-loot-sale-qty]");
     const maximo = Number(controle?.dataset.uiIntegerMax ?? controle?.max);
     const estoque = inteiro(maximo, 1, Number.MAX_SAFE_INTEGER) ? maximo
       : numero(texto(linha, ".loot-count strong").match(/^×\s*([\d.]+)$/)?.[1]);
     const digitado = controle?.type === "number" ? controle.valueAsNumber : numero(controle?.value);
     const chave = chaveLoot(id, nome);
-    if (!catalogo?.has(chave) || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
+    if (!/^id:\d+$/.test(id) || !nome || caixa.disabled || objeto?.bloqueado || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
         !inteiro(estoque, 1, Number.MAX_SAFE_INTEGER)) return null;
+    // Os controles da Loja NPC confirmam a disponibilidade e o preço efetivo da pilha.
+    catalogo ??= new Map();
+    catalogo.set(chave, { id: id.slice(3), nome, preco, vendavel: true });
     return { chave, nome, preco, estoque, qtd: inteiro(digitado, 1, estoque) ? digitado : estoque, caixa };
   }
 
@@ -800,7 +808,9 @@
       }
     }
     if (loja().querySelector('[data-bag-sale-tab="loot"][aria-selected="true"], .loot-filters')) {
+      const tamanho = catalogo?.size;
       estoqueLoot = new Map(pilhas().map(item => [item.chave, item.estoque]));
+      if (catalogo?.size !== tamanho) mostrarCatalogo();
       for (const rotulo of campo("loot").querySelectorAll("[data-estoque-loot]")) atualizarRotuloLoot(rotulo);
     }
     const gold = saldo();
@@ -815,8 +825,9 @@
     const partes = [`#${item.id}`];
     if (Number.isFinite(item.preco)) partes.push(`${formatar(item.preco)} por unidade`);
     if (estoque) partes.push(`${formatar(estoque)} na loja`);
-    if (!item.vendavel) partes.push("sem preço de venda ao NPC no catálogo");
-    else if (item.preco >= LIMITE_LOOT) partes.push("exige permissão explícita");
+    if (!item.vendavel) partes.push(item.bloqueado ? "protegido pelas regras do jogo" : "sem preço de venda ao NPC no catálogo");
+    else if (regrasLoot.get(chave) === "proteger") partes.push("venda bloqueada por você");
+    else if (item.preco >= LIMITE_LOOT && regrasLoot.get(chave) !== "vender-acima-do-limite") partes.push("exige permissão explícita");
     escrever(rotulo, partes.join(" · "));
   }
 
@@ -1029,10 +1040,18 @@
     abaLoja("loot");
     const permitido = item => item && lootPermitido(item.chave, modo, item.preco);
     const alvo = new Map();
-    for (const item of pilhas()) {
+    const disponiveis = pilhas();
+    for (const item of disponiveis) {
       if (permitido(item)) alvo.set(item.chave, item.caixa.dataset.lootSelect);
     }
-    if (!alvo.size) return;
+    if (!alvo.size) {
+      if (!disponiveis.length) return loja().querySelector(seletorLoot)
+        ? "Não foi possível validar os dados das pilhas de loot da Loja NPC. Aguardando nova leitura."
+        : "Nenhum loot vendável encontrado nos controles da Loja NPC.";
+      const bloqueados = disponiveis.filter(item => regrasLoot.get(item.chave) === "proteger").length;
+      const caros = disponiveis.filter(item => item.preco >= LIMITE_LOOT && regrasLoot.get(item.chave) !== "vender-acima-do-limite").length;
+      return `Loot conferido: ${bloqueados} tipos bloqueados, ${caros} a partir de 10.000 sem autorização${modo === "marcados" ? "; demais itens exigem marcação individual" : ""}.`;
+    }
 
     const limpar = () => loja()?.querySelector("[data-clear-loot-selection]:not(:disabled)");
     const marcadas = () => loja().querySelectorAll(`${seletorLoot}:checked`);
@@ -1339,7 +1358,7 @@
     const devida = operacao => agora >= (atual.proximas.get(operacao) ?? 0) &&
       agora >= lerPrazo(chavePrazo(atual, operacao));
     const comprasDevidas = compras.filter(regra => devida(regra.id));
-    const lootDevido = modoVenda && catalogo && devida("loot");
+    const lootDevido = modoVenda && devida("loot");
     const pokemonDevido = podeVenderPokemon && devida("pokemon");
     const precisaAbrirLoja = comprasDevidas.length || lootDevido || pokemonDevido;
     if (!precisaAbrirLoja) {
@@ -1485,7 +1504,7 @@
       qtd: campo(`${tipo}-qtd`).valueAsNumber,
     })).filter(regra => regra.id);
     const modoVenda = campo("modo-venda").value;
-    if (modoVenda === "marcados" && ![...regrasLoot].some(([chave, regra]) => catalogo ? lootPermitido(chave, modoVenda)
+    if (modoVenda === "marcados" && ![...regrasLoot].some(([chave, regra]) => catalogo?.has(chave) ? lootPermitido(chave, modoVenda)
       : regra === "vender" || regra === "vender-acima-do-limite")) {
       return informar("Marque os itens de loot que quer vender.");
     }
