@@ -17,7 +17,7 @@ Em clones anteriores à mudança de nome, atualize o endereço com `git remote s
 
 ## Autocaptura
 
-A Autocaptura inicia ao abrir a página do jogo e usa o botão **Capturar** nos modos normal e economia. Use o botão roxo do painel para ligar ou desligar a captura. No Windows, o arquivo `Ativar Autocaptura.bat` permite reativá-la com a extensão instalada.
+A Autocaptura começa **desligada** ao abrir ou recarregar a página do jogo. Use o botão roxo do painel para ligar ou desligar a captura, que usa o botão **Capturar** nos modos normal e economia. No Windows, executar `Ativar Autocaptura.bat` também ativa a captura com a extensão instalada.
 
 No **modo economia**, o Assist acompanha automaticamente a parte inferior do painel da caçada, inclusive quando o conteúdo cresce ou a janela muda de tamanho. Com a Autocaptura ligada, traz cada botão **Capturar** pendente para a área visível antes de clicar, mesmo em listas maiores que a tela. Sem capturas pendentes, mantém a rolagem no fim do painel. A rolagem também continua com a Autocaptura pausada, enquanto o modo economia estiver ativo. Ela aguarda durante menus, diálogos e edição de campos; no modo normal, a posição de rolagem é livre.
 
@@ -41,7 +41,7 @@ A Poké Bola do cabeçalho e das mensagens acompanha o estado da loja: centro **
 2. Em **Estoque mín.**, defina o estoque que dispara a compra. Em **Comprar**, informe a quantidade por pedido. Por exemplo, **Estoque mín. 10** e **Comprar 50** repõem 50 unidades quando restarem 10 ou menos.
 3. Defina a **Reserva de Pokédollars** e clique em **Iniciar loja**. A compra exige saldo para o lote inteiro e para a reserva.
 
-A Poké Bola, a poção e o revive escolhidos para reposição também são selecionados para uso no Auto Helper enquanto a Autocaptura ou a reposição correspondente estiver ativa. Ao receber estoque, a extensão volta a selecionar o item configurado, inclusive depois de uma troca automática do jogo para um item inferior. Escolha **Sem reposição** para controlar o tipo daquele suprimento pelo próprio jogo. O limiar de HP para usar poções segue a configuração do Auto Helper. A reposição de revive também funciona fora da hunt. [Guia do Auto Helper](https://multipoke.io/pokepedia/guias/auto-helper)
+A Poké Bola, a poção e o revive escolhidos para reposição também são selecionados para uso no Auto Helper enquanto a Autocaptura ou a reposição correspondente estiver ativa. Ao receber estoque, a extensão volta a selecionar o item configurado, inclusive depois de uma troca automática do jogo para um item inferior. Escolha **Sem reposição** para controlar o tipo daquele suprimento pelo próprio jogo. O limiar de HP para usar poções segue a configuração do Auto Helper. A reposição dos três tipos funciona dentro e fora de hunt. [Guia do Auto Helper](https://multipoke.io/pokepedia/guias/auto-helper)
 
 ### Vender loot
 
@@ -49,9 +49,9 @@ Em **Venda automática**, escolha **Somente marcados para venda** para vender ap
 
 Em **Permissões de venda por item**, busque por nome ou ID e use **Permitir venda** ou **Bloquear venda**. O bloqueio vale em qualquer modo. Antes de vender, o MultiPoke Assist limpa a seleção anterior de loot e confere os itens do lote.
 
-A leitura acompanha os metadados de catálogo e inventário enviados pelo jogo, inclusive mensagens agrupadas e atualizações incrementais. O preço do inventário tem prioridade sobre o preço de referência do catálogo, como na loja nativa. Os controles reais de venda também são conferidos: uma pilha oferecida pela Loja NPC pode ser reconhecida mesmo que esteja ausente do catálogo recebido. O estoque e a quantidade vêm dos controles numéricos, e as permissões são associadas ao ID para preservar bloqueios mesmo quando o nome exibido muda. Não há conexões adicionais ou comandos enviados pela conexão observada. Recarregue o jogo após atualizar para receber os dados desde o início.
+A leitura acompanha os objetos de catálogo e inventário enviados pelo jogo, inclusive mensagens agrupadas e atualizações incrementais. O preço do inventário tem prioridade sobre o preço de referência do catálogo, como na loja nativa. O estoque vem do objeto do inventário e é conferido com o limite numérico da pilha na Loja NPC. A quantidade escolhida vem do controle numérico, e as permissões são associadas ao ID para preservar bloqueios mesmo quando o nome exibido muda. Recarregue o jogo após atualizar para receber os dados desde o início.
 
-Se os objetos não estiverem disponíveis, a leitura alternativa reconhece o preço resumido e a descrição de venda à Loja NPC da Pokepédia. A disponibilidade de obtenção do item não bloqueia a venda de estoque já existente. Somente loots com preço de NPC válido e listados nos controles de venda da loja entram no lote; itens sem preço continuam indisponíveis.
+A Pokepédia pública continua completando a lista de permissões, mas as operações aguardam os objetos válidos do jogo. A disponibilidade de obtenção do item não bloqueia a venda de estoque já existente. Somente loots com preço de NPC válido e listados nos controles de venda da loja entram no lote; itens sem preço continuam indisponíveis.
 
 Quando nenhum item puder entrar no lote, o status informa bloqueios, preços a partir de 10.000 sem autorização ou dados que ainda não puderam ser validados. A leitura não desmarca proteções individuais nem ativa um modo de venda que estava desligado.
 
@@ -59,11 +59,15 @@ Quando nenhum item puder entrar no lote, o status informa bloqueios, preços a p
 
 Expanda **Venda de Pokémon**, ative a opção e informe um limite de qualidade, de IV total ou ambos. Com dois limites, **E** exige que os dois sejam atendidos e **OU** exige pelo menos um. Os valores precisam estar abaixo dos limites.
 
-Cada lote reúne até 20 Pokémon, com prioridade para capturas antigas. Iniciais, Pokémon da equipe ou da reserva, trancados, Shiny, Holo e de qualidade Lendária ou superior (1,70×) ficam protegidos. Uma seleção manual adia a venda de Pokémon.
+Cada lote reúne até 20 Pokémon, com prioridade para capturas antigas. Qualidade, IV, preço e proteções são conferidos nos objetos da coleção, inclusive para indivíduos que saíram da área visível ao rolar a lista. Iniciais, Pokémon da equipe, da reserva ou da Breeding Box, trancados, Shiny, Holo e de qualidade Lendária ou superior (1,70×) ficam protegidos. Uma seleção manual adia a venda de Pokémon.
 
 ### Funcionamento da loja
 
-A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segundos** enquanto o jogo estiver disponível e a aba estiver visível. A loja pode funcionar com o painel recolhido. A sessão é retomada ao recarregar a mesma aba com o mesmo treinador. Use **Pausar loja** para interromper as operações e editar as regras.
+A reposição é verificada a cada **5 segundos** e as vendas a cada **30 segundos** enquanto o jogo estiver disponível e a aba estiver visível. Compras de suprimentos, venda de loot e venda de Pokémon funcionam **dentro e fora de hunt**, inclusive no Centro Pokémon. A loja pode funcionar com o painel recolhido. A sessão é retomada ao recarregar a mesma aba com o mesmo treinador. Use **Pausar loja** para interromper as operações e editar as regras.
+
+Saldo, preços, estoques e filtros de Pokémon vêm dos objetos recebidos pela conexão existente. O observador acompanha o comando enviado pelos controles nativos e exige a resposta `command-result` com o mesmo `requestId`, além da atualização dos objetos, para concluir cada operação. Os textos dos avisos de sucesso não são usados como comprovante. Perda de conexão, lacunas nos snapshots e mudança de treinador suspendem as operações; pedidos sem confirmação mantêm a espera de segurança antes de nova tentativa.
+
+As janelas nativas de revisão ainda são conferidas pela interface, incluindo seus textos e totais: o jogo mantém os objetos dessas janelas privados ao módulo. Os cliques continuam nos controles oficiais. A extensão não abre conexões adicionais, não envia comandos próprios e não altera os dados enviados pelo jogo.
 
 ## Hunts
 

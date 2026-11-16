@@ -75,9 +75,6 @@
   const ESPERA_OPERACAO_INCERTA = 60_000;
   // As chaves legadas permitem recuperar as configurações das instalações existentes.
   const chaveSessao = "multipoke.auto-loja.sessao";
-  const bolas = new Set(["poke ball", "great ball", "super ball", "ultra ball"]);
-  const pocoes = new Set(["small potion", "great potion", "ultra potion", "hyper potion", "ultimate potion", "max potion"]);
-  const revives = new Set(["revive", "max revive"]);
   const rotulosCompra = { bola: "Poké Bolas", pocao: "poções", revive: "revives" };
   const tiposCompra = Object.keys(rotulosCompra);
   const normalizar = texto => texto.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -98,10 +95,8 @@
   };
   const jogo = seletor => document.querySelector(seletor);
   const loja = () => jogo("#drawer.open.bag-drawer .bag-layout");
-  const saldo = () => numero(texto(document, "#drawer.open [data-bag-balance] strong").match(/^\$\s*([\d.]+)$/)?.[1]);
+  const saldo = () => objetosDaLoja()?.trainer?.pokedollars ?? objetosDaLoja()?.trainer?.gold ?? NaN;
   const treinador = () => texto(document, "#party-trainer-name");
-  const cacada = () => texto(document, "#hunt-header-state") === "CAÇANDO";
-  const huntAtiva = () => Boolean(jogo('#hunt-header[aria-label="Hunt atual"]')) || cacada();
   const modal = () => jogo("dialog[open]");
 
   const chavePainel = "multipoke.auto-loja.painel-oculto";
@@ -634,6 +629,8 @@
   const escolhasCompra = new Map();
   const regrasLoot = new Map();
   const objetosLoot = new Map();
+  let estadoLoja = null;
+  const objetosDaLoja = () => estadoLoja?.conectada === true && estadoLoja.trainer?.name === treinador() ? estadoLoja : null;
   let estoqueLoot = new Map();
   let catalogo;
   let proximaConsultaCatalogo = 0;
@@ -709,6 +706,21 @@
   });
   document.dispatchEvent(new Event("multipoke:consultar-objetos-loot"));
 
+  document.addEventListener("multipoke:objetos-loja", event => {
+    if (typeof event.detail !== "string" || event.detail.length > 30_000_000) { estadoLoja = null; return; }
+    try {
+      const dados = JSON.parse(event.detail);
+      if (dados === null) { estadoLoja = null; return; }
+      if (!dados || typeof dados !== "object" || typeof dados.conectada !== "boolean" ||
+          typeof dados.trainer?.name !== "string" ||
+          ![dados.trainer.pokedollars, dados.trainer.gold].some(valor => inteiro(valor, 0, Number.MAX_SAFE_INTEGER)) ||
+          !["balls", "supplies", "inventory", "collection", "team"].every(chave => dados[chave] === undefined ||
+            Array.isArray(dados[chave]) && dados[chave].length <= 100_000)) { estadoLoja = null; return; }
+      estadoLoja = dados;
+    } catch { estadoLoja = null; }
+  });
+  document.dispatchEvent(new Event("multipoke:consultar-objetos-loja"));
+
   function publicarReposicao() {
     raiz.dataset.multipokeTreinadorReposicao = treinadorConfigurado;
     for (const tipo of tiposCompra) {
@@ -749,13 +761,16 @@
 
   function produto(linha) {
     const id = linha.dataset.shopRow;
-    const nome = texto(linha, ".shop-row-main strong");
-    const chave = normalizar(nome);
-    const tipo = id.startsWith("ball:") && bolas.has(chave) ? "bola"
-      : id.startsWith("supply:") && pocoes.has(chave) ? "pocao"
-      : id.startsWith("supply:") && revives.has(chave) ? "revive" : null;
-    const estoque = numero(texto(linha, "[data-shop-owned]").match(/^([\d.]+) na mochila$/)?.[1]);
-    const preco = numero(texto(linha, "[data-shop-price]").match(/^\$\s*([\d.]+)$/)?.[1]);
+    if (!/^(ball|supply):\d+$/.test(id)) return null;
+    const bola = id.startsWith("ball:");
+    const objeto = objetosDaLoja()?.[bola ? "balls" : "supplies"]?.find(item => Number(item.id) === Number(id.split(":")[1]));
+    if (!objeto || objeto.shopGoldEnabled === false) return null;
+    const nome = objeto.name;
+    if (typeof nome !== "string" || !nome) return null;
+    const tipo = bola ? "bola"
+      : objeto.kind === "potion" ? "pocao" : objeto.kind === "revive" ? "revive" : null;
+    const estoque = objeto.quantity ?? 0;
+    const preco = bola ? objeto.priceGold : objeto.buyGold;
     return tipo && inteiro(estoque, 0, Number.MAX_SAFE_INTEGER) && inteiro(preco, 1, Number.MAX_SAFE_INTEGER)
       ? { id, tipo, nome, estoque, preco, linha } : null;
   }
@@ -765,17 +780,18 @@
     const id = caixa.dataset.lootSelect;
     const nome = texto(linha, ".loot-identity strong");
     const objeto = objetosLoot.get(id);
-    const precoLoja = numero(texto(linha, ".loot-identity small").match(/^\$\s*([\d.]+) cada$/)?.[1]);
-    const preco = Number.isFinite(precoLoja) ? precoLoja : objeto?.preco;
+    const inventario = objetosDaLoja()?.inventory?.find(item => Number(item.id ?? item.itemId) === Number(id?.slice(3)));
+    const preco = inventario?.npcPrice ?? objeto?.preco;
     const controle = linha.querySelector("input[data-loot-sale-qty]");
     const maximo = Number(controle?.dataset.uiIntegerMax ?? controle?.max);
-    const estoque = inteiro(maximo, 1, Number.MAX_SAFE_INTEGER) ? maximo
-      : numero(texto(linha, ".loot-count strong").match(/^×\s*([\d.]+)$/)?.[1]);
+    const estoque = inventario?.quantity;
     const digitado = controle?.type === "number" ? controle.valueAsNumber : numero(controle?.value);
     const chave = chaveLoot(id, nome);
-    if (!/^id:\d+$/.test(id) || !nome || caixa.disabled || objeto?.bloqueado || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
+    if (!/^id:\d+$/.test(id) || !nome || caixa.disabled || objeto?.bloqueado || inventario?.evolutionStone ||
+        inventario?.shopBoost || inventario?.breedingPheromone || !inteiro(preco, 1, Number.MAX_SAFE_INTEGER) ||
+        maximo !== estoque ||
         !inteiro(estoque, 1, Number.MAX_SAFE_INTEGER)) return null;
-    // Os controles da Loja NPC confirmam a disponibilidade e o preço efetivo da pilha.
+    // Cruza os objetos com os controles habilitados da Loja NPC.
     catalogo ??= new Map();
     catalogo.set(chave, { id: id.slice(3), nome, preco, vendavel: true });
     return { chave, nome, preco, estoque, qtd: inteiro(digitado, 1, estoque) ? digitado : estoque, caixa };
@@ -935,44 +951,66 @@
     catch { return false; }
   }
 
-  function comprovante(reservar, disparar, confere, atualizou) {
+  function comandoConfere(recebido, esperado) {
+    if (recebido?.type !== esperado.type) return false;
+    if (esperado.type === "buy-ball" || esperado.type === "buy-supply") {
+      const chave = esperado.type === "buy-ball" ? "ballId" : "supplyId";
+      return recebido[chave] === esperado[chave] && recebido.quantity === esperado.quantity;
+    }
+    if (esperado.type === "sell-pokemon-bulk") {
+      return Array.isArray(recebido.pokemonIds) && recebido.pokemonIds.length === esperado.pokemonIds.length &&
+        new Set(recebido.pokemonIds).size === esperado.pokemonIds.length && recebido.pokemonIds.every(id => esperado.pokemonIds.includes(id));
+    }
+    return Array.isArray(recebido.items) && recebido.items.length === esperado.items.length &&
+      new Set(recebido.items.map(item => item.itemId)).size === esperado.items.length && recebido.items.every(item =>
+        esperado.items.some(alvo => alvo.itemId === item.itemId && alvo.quantity === item.quantity));
+  }
+
+  function comprovante(reservar, disparar, esperado, atualizou) {
     return new Promise((resolve, reject) => {
-      let area = jogo("#toast-area");
-      if (!area) return reject(new Error("Área de comprovantes da loja indisponível."));
-      let recebido = false;
-      const lerAviso = no => {
-        if (no.matches?.(".toast.good") && confere(no.textContent.trim())) recebido = true;
-      };
+      if (!objetosDaLoja()) return reject(new Error("Aguardando os objetos da loja. Recarregue o jogo se necessário."));
+      let requestId = null, recebido = false, encerrado = false;
+      const nome = treinador();
       const terminar = erro => {
+        if (encerrado) return;
+        encerrado = true;
         clearInterval(checagem);
         clearTimeout(prazo);
-        observador.disconnect();
+        document.removeEventListener("multipoke:loja-comando", lerComando);
+        document.removeEventListener("multipoke:loja-resultado", lerResultado);
         if (erro) reject(erro);
-        else resolve(recebido);
+        else resolve(Boolean(requestId));
       };
-      const observador = new MutationObserver(mudancas => {
-        for (const mudanca of mudancas) {
-          for (const no of mudanca.addedNodes) lerAviso(no);
-        }
-      });
-      const checagem = setInterval(() => {
+      const ler = event => {
+        if (typeof event.detail !== "string" || event.detail.length > 100_000) return null;
+        try { return JSON.parse(event.detail); } catch { return null; }
+      };
+      const lerComando = event => {
+        const comando = ler(event);
+        if (requestId || !comando || typeof comando.requestId !== "string") return;
         try {
-          const atual = jogo("#toast-area");
-          if (atual && atual !== area) {
-            observador.disconnect();
-            area = atual;
-            for (const no of area.children) lerAviso(no);
-            observador.observe(area, { childList: true });
-          }
-          if (recebido && loja() && atualizou()) terminar();
-        } catch { /* A loja pode estar sendo redesenhada. */ }
+          if (!comandoConfere(comando, esperado)) return terminar(new Error("O comando enviado divergiu da operação esperada. Confira a loja."));
+          requestId = comando.requestId;
+        } catch { terminar(new Error("Comando da loja inválido.")); }
+      };
+      const lerResultado = event => {
+        const resultado = ler(event);
+        if (!requestId || resultado?.requestId !== requestId) return;
+        if (resultado.ok === true) recebido = true;
+        else if (resultado.ok === false) terminar(new Error("O servidor recusou a operação da loja."));
+      };
+      const checagem = setInterval(() => {
+        if (treinador() !== nome || !objetosDaLoja() || !jogoDisponivel()) {
+          terminar(new Error("Conexão ou treinador mudou durante a operação. Confira o resultado no jogo."));
+          return;
+        }
+        try { if (recebido && atualizou()) terminar(); }
+        catch { /* Aguarda uma projeção válida durante o redesenho da loja. */ }
       }, 100);
-      const prazo = setTimeout(() => {
-        const erro = new Error(recebido ? "Operação confirmada. Aguardando a atualização do estoque."
-          : "Operação sem comprovante. Aguardando antes de conferir o estoque novamente.");
-        terminar(erro);
-      }, PRAZO_COMPROVANTE);
-      observador.observe(area, { childList: true });
+      const prazo = setTimeout(() => terminar(new Error(recebido ? "Operação confirmada pelo servidor. Aguardando a atualização dos objetos."
+        : "Operação sem confirmação do servidor. Aguardando antes de conferir novamente.")), PRAZO_COMPROVANTE);
+      document.addEventListener("multipoke:loja-comando", lerComando);
+      document.addEventListener("multipoke:loja-resultado", lerResultado);
       try {
         reservar();
         const enviada = disparar();
@@ -1009,6 +1047,7 @@
       input.dispatchEvent(new Event("input", { bubbles: true }));
     };
     const pedido = `${formatar(regra.qtd)}× ${item.nome}`;
+    const saldoAntes = saldo();
     const concluida = await comprovante(reservar, () => {
       try {
         alterar(String(regra.qtd));
@@ -1031,8 +1070,9 @@
         });
         return aviso ? null : confirmada;
       } finally { if (input.isConnected) alterar(anterior); }
-    }, mensagem => mensagem === `Compra concluída: ${pedido} por ${formatar(custo)} Pokédollars.`,
-    () => produtoPorId(item.id)?.estoque > item.estoque);
+    }, { type: regra.tipo === "bola" ? "buy-ball" : "buy-supply",
+      [regra.tipo === "bola" ? "ballId" : "supplyId"]: Number(item.id.split(":")[1]), quantity: regra.qtd },
+    () => saldo() <= saldoAntes - custo && produtoPorId(item.id)?.estoque > item.estoque);
     return aviso ?? (concluida ? `Comprou ${pedido}` : undefined);
   }
 
@@ -1076,7 +1116,6 @@
       const total = itens.reduce((soma, item) => soma + item.qtd * item.preco, 0);
       const quantidade = itens.reduce((soma, item) => soma + item.qtd, 0);
       if (!Number.isSafeInteger(total) || !Number.isSafeInteger(quantidade)) throw new Error("Total da venda inválido.");
-      const estoqueAntes = new Map(itens.map(item => [item.chave, item.estoque]));
       const botao = loja().querySelector("[data-bulk-sell-loot]:not(:disabled)");
       const concluida = await comprovante(reservar, () => {
         if (!botao || modal()) return false;
@@ -1089,30 +1128,45 @@
           return revisao.length === esperado.length && revisao.every((nome, i) => nome === esperado[i]) &&
             [...dialogo.querySelectorAll(".ui-confirm__details dd")].at(-1)?.textContent.trim() === `$ ${formatar(total)}`;
         });
-      }, mensagem => mensagem === `${formatar(quantidade)} itens vendidos por ${formatar(total)} Pokédollars.`,
-      () => !pilhas().some(atual => atual.estoque >= (estoqueAntes.get(atual.chave) ?? Infinity)));
+      }, { type: "sell-loot-bulk", items: itens.map(item => ({ itemId: Number(item.chave.slice(3)), quantity: item.qtd })) },
+      () => Array.isArray(objetosDaLoja()?.inventory) && itens.every(item => {
+        const atual = objetosDaLoja().inventory.find(loot => Number(loot.id ?? loot.itemId) === Number(item.chave.slice(3)));
+        return (atual?.quantity ?? 0) <= item.estoque - item.qtd;
+      }));
       if (concluida) return `Vendeu ${formatar(quantidade)} loots por ${formatar(total)} Pokédollars`;
     } finally {
       if (inicio === interacoes && !modal()) limpar()?.click();
     }
   }
 
-  function pokemonElegivel(linha, filtro) {
-    const caixa = linha.querySelector("input[data-sale-select]:not(:disabled)");
-    const id = linha.dataset.pokemonId;
-    if (!id || caixa?.dataset.saleSelect !== id || linha.matches('[data-shiny="true"], [data-holo="true"]')) return null;
-    const selo = texto(linha, ".quality-badge").match(/^(.+) · (\d+,\d{2})×$/);
-    const qualidade = Number(selo?.[2].replace(",", "."));
+  function pokemonDoObjeto(id, filtro) {
+    const dados = objetosDaLoja();
+    const objeto = dados?.collection?.find(item => item.id === id);
+    if (!objeto || objeto.starter || objeto.locked || objeto.shiny || objeto.holo || objeto.reserved || objeto.breedingBox ||
+        !Array.isArray(dados.team) || dados.team.some(item => item.id === id)) return null;
+    const qualidade = objeto.quality;
     if (!(qualidade > 0 && qualidade < QUALIDADE_LENDARIA)) return null;
-    const iv = numero(texto(linha, ".pokemon-iv-total").match(/^(\d+)\/192$/)?.[1]);
+    const iv = objeto.ivTotal;
     if (!inteiro(iv, 6, 192)) return null;
     const exigeAmbos = filtro.condicao !== "ou";
     const atendeQualidade = filtro.qualidade === null ? exigeAmbos : qualidade < filtro.qualidade;
     const atendeIv = filtro.iv === null ? exigeAmbos : iv < filtro.iv;
     if (!(exigeAmbos ? atendeQualidade && atendeIv : atendeQualidade || atendeIv)) return null;
-    const preco = numero(texto(linha, ".pokemon-sale-price strong").match(/^\$\s*([\d.]+)$/)?.[1]);
+    const preco = objeto.saleValue;
     if (!inteiro(preco, 1, Number.MAX_SAFE_INTEGER)) return null;
-    return { id, caixa, preco, faixa: selo[1] };
+    return { id, preco };
+  }
+
+  function pokemonElegivel(linha, filtro) {
+    const caixa = linha.querySelector("input[data-sale-select]:not(:disabled)");
+    const id = linha.dataset.pokemonId;
+    if (!id || caixa?.dataset.saleSelect !== id || linha.matches('[data-shiny="true"], [data-holo="true"]')) return null;
+    const objeto = pokemonDoObjeto(id, filtro);
+    if (!objeto) return null;
+    // O rótulo serve somente à revisão da janela nativa; os filtros usam o objeto.
+    const faixa = texto(linha, ".quality-badge").split(" · ")[0];
+    if (!faixa) return null;
+    return { ...objeto, caixa, faixa };
   }
 
   function suspenderFiltrosPokemon(layout) {
@@ -1154,7 +1208,7 @@
     const topo = rolagem.scrollTop;
     const lote = new Map();
     const treinadorDaVenda = treinador();
-    const continuaVenda = () => continua() && huntAtiva() && loja() === layout && !modal();
+    const continuaVenda = () => continua() && objetosDaLoja() && loja() === layout && !modal();
     let selecaoManual = false;
     const registrarSelecaoManual = event => {
       if (event.isTrusted && event.target.closest(".pokemon-sale-row .depot-check, [data-select-filtered-sale-pokemon], [data-clear-sale-selection]")) {
@@ -1196,9 +1250,10 @@
       for (const item of lote.values()) preco += item.preco;
       const barra = layout.querySelector(".sale-selection-sticky");
       const botao = barra?.querySelector("[data-bulk-sell-sale-pokemon]:not(:disabled)");
+      const loteValido = () => [...lote.values()].every(item => pokemonDoObjeto(item.id, filtro)?.preco === item.preco);
       // O resumo da loja inclui os marcados cujos cartões saíram do DOM ao rolar.
       if (caixas().length !== marcadosVisiveis.length || !marcadosVisiveis.every(item => lote.has(item.id)) ||
-          !Number.isSafeInteger(preco) || !botao || texto(barra, "strong") !== `${quantidade} selecionados no filtro` ||
+          !loteValido() || !Number.isSafeInteger(preco) || !botao || texto(barra, "strong") !== `${quantidade} selecionados no filtro` ||
           texto(barra, "small") !== `${formatar(preco)} Pokédollars`) {
         throw new Error("A seleção de Pokémon mudou antes da venda.");
       }
@@ -1214,12 +1269,13 @@
         const dialogo = modal();
         if (!dialogo) return semDialogo;
         return confirmar(dialogo, "Confirmar venda de Pokémon", "Vender", dialogo => {
+          if (!loteValido()) return false;
           const linhas = [...dialogo.querySelectorAll(".ui-confirm__details > div")];
           return linhas.length === esperado.size && new Set(linhas.map(linha => texto(linha, "dt"))).size === esperado.size &&
             linhas.every(linha => esperado.get(texto(linha, "dt")) === texto(linha, "dd"));
         });
-      }, mensagem => mensagem === `${quantidade} Pokémon vendidos por ${formatar(preco)} Pokédollars.`,
-      () => !limpar() && !caixas().length);
+      }, { type: "sell-pokemon-bulk", pokemonIds: [...lote.keys()] },
+      () => Array.isArray(objetosDaLoja()?.collection) && !objetosDaLoja().collection.some(item => lote.has(item.id)));
       if (concluida) return `Vendeu ${quantidade} Pokémon por ${formatar(preco)} Pokédollars`;
     } finally {
       layout.removeEventListener("click", registrarSelecaoManual, true);
@@ -1309,18 +1365,24 @@
   async function operar(atual, operacao, rotulo, intervalo, executar) {
     const agora = Date.now();
     const chave = chavePrazo(atual, operacao);
+    const chaveConfirmacao = chavePrazo(atual, "confirmacao");
     if (agora < (atual.proximas.get(operacao) ?? 0) || agora < lerPrazo(chave)) return;
     let reservou = false;
     try {
       const aviso = await executar(() => {
         salvarPrazo(chave, Date.now() + PRAZO_COMPROVANTE + ESPERA_OPERACAO_INCERTA);
+        salvarPrazo(chaveConfirmacao, Date.now() + PRAZO_COMPROVANTE + ESPERA_OPERACAO_INCERTA);
         reservou = true;
       });
       atual.avisos.delete(operacao);
-      if (reservou) salvarPrazo(chave, agora + intervalo);
+      if (reservou) {
+        salvarPrazo(chave, agora + intervalo);
+        salvarPrazo(chaveConfirmacao, 0);
+      }
       if (aviso) atual.avisos.set(operacao, aviso);
     } catch (erro) {
       atual.avisos.set(operacao, `${rotulo} · ${erro?.message || "Aguardando nova tentativa."}`);
+      return false;
     } finally {
       atual.proximas.set(operacao, agora + intervalo);
     }
@@ -1333,6 +1395,10 @@
     const nome = treinador();
     if (!nome || !jogoDisponivel()) return aguardar("Aguardando o jogo e o treinador voltarem a ficar disponíveis.");
     if (nome !== atual.treinador) return pausar("Treinador mudou. Confira as regras antes de retomar.");
+    if (!objetosDaLoja()) return aguardar("Aguardando os objetos da loja. Recarregue o jogo se necessário.");
+    if (Date.now() < lerPrazo(chavePrazo(atual, "confirmacao"))) {
+      return aguardar("Aguardando a segurança do último pedido sem confirmação antes de operar novamente.");
+    }
     sincronizarTreinador(nome);
     if (trocaHunts.emTroca()) return aguardar("Aguardando a conclusão da troca de hunt.");
     if (modal() || jogo("#drawer.open")) return aguardar("Aguardando o fechamento do menu ou da janela do jogo.");
@@ -1343,13 +1409,10 @@
     if (performance.now() - ultimaInteracao < 1500) return;
     const inicio = interacoes;
     const continua = () => sessao === atual && treinador() === atual.treinador &&
-      inicio === interacoes && !document.hidden && jogoDisponivel();
-    const emCacada = cacada();
-    const revive = atual.compras.find(regra => regra.tipo === "revive");
-    const compras = emCacada ? atual.compras : revive ? [revive] : [];
-    const modoVenda = emCacada && atual.modoVenda;
-    const podeVenderPokemon = atual.filtroPokemon && (emCacada || huntAtiva());
-    if (!compras.length && !modoVenda && !podeVenderPokemon) return aguardar("Aguardando uma caçada compatível com as operações escolhidas.");
+      inicio === interacoes && !document.hidden && jogoDisponivel() && objetosDaLoja();
+    const compras = atual.compras;
+    const modoVenda = atual.modoVenda;
+    const podeVenderPokemon = atual.filtroPokemon;
     if (modoVenda && !catalogo && Date.now() >= proximaConsultaCatalogo) {
       void carregarCatalogo().then(mostrarCatalogo).catch(() => {});
     }
@@ -1372,14 +1435,13 @@
         await comLoja(false, async () => {
           for (const regra of comprasDevidas) {
             if (!continua() || !loja() || modal()) return;
-            if (regra.tipo !== "revive" && !cacada()) continue;
             const rotulo = `Reposição de ${rotulosCompra[regra.tipo]}`;
-            await operar(atual, regra.id, rotulo, INTERVALO_ESTOQUE, reservar => comprar(regra, atual.reserva, reservar));
+            if (await operar(atual, regra.id, rotulo, INTERVALO_ESTOQUE, reservar => comprar(regra, atual.reserva, reservar)) === false) return;
           }
-          if (lootDevido && continua() && cacada() && loja() && !modal()) {
-            await operar(atual, "loot", "Venda de loot", INTERVALO_VENDA, reservar => vender(modoVenda, reservar));
+          if (lootDevido && continua() && loja() && !modal()) {
+            if (await operar(atual, "loot", "Venda de loot", INTERVALO_VENDA, reservar => vender(modoVenda, reservar)) === false) return;
           }
-          if (pokemonDevido && continua() && huntAtiva() && loja() && !modal()) {
+          if (pokemonDevido && continua() && loja() && !modal()) {
             await operar(atual, "pokemon", "Venda de Pokémon", INTERVALO_VENDA,
               reservar => venderPokemon(atual.filtroPokemon, continua, reservar));
           }

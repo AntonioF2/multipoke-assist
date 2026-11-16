@@ -31,6 +31,8 @@ jobs:
         run: |
           node --check autocaptura.js
           node --check objetos-loot.js
+          node --check objetos-loja.js
+          node --test scripts/loja.test.cjs
           node --check avisos.js
           node --check combate-hunts.js
           node --check dados-hunts.js

@@ -1,4 +1,4 @@
-// Cole este arquivo no Console do navegador com o MultiPoke Idle aberto em /jogar.
+// Carrega a autocaptura desligada. Ative pelo botão do painel ou pelo lançador.
 // Para pausar a captura nesta aba, execute multiPokeCaptura.parar().
 (() => {
   if (location.origin !== "https://multipoke.io" || !/^\/jogar\/?$/.test(location.pathname)) {
@@ -9,7 +9,6 @@
   const comando = "multipoke:autocaptura";
   const raiz = document.documentElement;
   if (raiz.hasAttribute("data-multipoke-autocaptura")) {
-    document.dispatchEvent(new CustomEvent(comando, { detail: "iniciar" }));
     return true;
   }
 
@@ -162,6 +161,6 @@
     }
   });
   setInterval(clicarSeDisponivel, 350);
-  iniciar();
+  raiz.dataset.multipokeAutocaptura = "pausada";
   return true;
 })();

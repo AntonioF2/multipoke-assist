@@ -26,12 +26,18 @@ async function ativar() {
   const [execucao] = await chrome.scripting.executeScript({
     target: { tabId: aba.id },
     world: "MAIN",
-    files: ["autocaptura.js"],
+    files: ["objetos-loot.js", "objetos-loja.js", "autocaptura.js"],
   });
   if (execucao?.result !== true) {
     statusAtivacao.textContent = "A aba mudou antes da ativação. Abra a caçada e tente novamente.";
     return;
   }
+
+  await chrome.scripting.executeScript({
+    target: { tabId: aba.id },
+    world: "MAIN",
+    func: () => document.dispatchEvent(new CustomEvent("multipoke:autocaptura", { detail: "iniciar" })),
+  });
 
   await chrome.scripting.executeScript({
     target: { tabId: aba.id },
