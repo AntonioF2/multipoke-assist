@@ -108,7 +108,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       cabecalho.append(imagem(regra.id), titulo, alternar);
       const opcoes = document.createElement("fieldset");
       const legenda = document.createElement("legend");
-      legenda.textContent = "Melhorias autorizadas";
+      legenda.textContent = "Melhoria autorizada · escolha uma";
       opcoes.append(legenda);
       for (const [tipo, rotulo] of Object.entries(categorias)) {
         const label = document.createElement("label");
@@ -119,7 +119,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         controle.dataset.tipo = tipo;
         controle.setAttribute("aria-label", `${rotulo} para ${regra.nome}`);
         controle.addEventListener("change", () => {
-          const tipos = Object.keys(categorias).filter(item => item === tipo ? controle.checked : regra.tipos.includes(item));
+          const tipos = controle.checked ? [tipo] : [];
           void configurar({ ...regra, tipos, ativa: false });
         });
         label.append(controle, document.createTextNode(rotulo));
@@ -128,7 +128,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       const nota = document.createElement("p");
       nota.className = "dex-regra-nota";
       nota.textContent = notas.get(regra.id) || regra.aviso || (regra.ativa
-        ? "Aguardando pontos disponíveis para esta espécie." : "Marque os bônus desejados e ative este Pokémon.");
+        ? "Aguardando pontos disponíveis para esta espécie." : "Marque um bônus e ative este Pokémon.");
       cartao.append(cabecalho, criarProgresso(regra), opcoes, nota);
       if (!regra.ativa) {
         const rodape = document.createElement("div");
@@ -190,7 +190,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         regras = await enviar("dex-listar", {}, nome);
         notas.delete(regra.id);
         informar(acao === "dex-remover" ? `${regra.nome} removido da lista. Você pode adicioná-lo novamente pela busca.`
-          : regra.ativa ? `${regra.nome}: melhoria automática ativada.` : `${regra.nome}: melhorias automáticas desativadas. Ative após escolher os bônus.`);
+          : regra.ativa ? `${regra.nome}: melhoria automática ativada.` : `${regra.nome}: melhoria automática desativada. Ative após escolher um bônus.`);
       }
     } catch (erro) {
       informar(erro.message || "Não foi possível atualizar a lista da Pokédex.");
@@ -294,6 +294,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       dispositivo.querySelector('[data-dex-mastery-toggle][aria-expanded="false"]')?.click();
       await guardarProgresso(regra, nome);
       if (somenteProgresso) return;
+      if (regra.tipos.length !== 1) { notas.set(regra.id, "Escolha apenas uma melhoria antes de ativar."); return; }
       const antes = lerDetalhe(regra.id);
       if (!antes) { notas.set(regra.id, "Aguardando uma leitura completa da Pokédex."); return; }
       if (!antes.pontos) { notas.set(regra.id, "Sem Pontos Dex livres. Aguardando novos pontos desta espécie."); return; }
@@ -302,8 +303,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
         const incremento = antes.percentual(botao?.querySelector(".dex-upgrade-increment"));
         const custo = botao?.querySelector(".dex-upgrade-cost")?.textContent.trim().replace(/\s+/g, " ");
         return { tipo, botao, incremento, custo };
-      }).filter(item => item.botao && item.incremento > 0 && normalizar(item.custo ?? "") === "1 ponto dex")
-        .sort((a, b) => antes.bonus[a.tipo] - antes.bonus[b.tipo]);
+      }).filter(item => item.botao && item.incremento > 0 && normalizar(item.custo ?? "") === "1 ponto dex");
       const escolha = escolhas[0];
       if (!escolha) { notas.set(regra.id, "Melhorias selecionadas indisponíveis ou limite atingido no jogo."); return; }
       reserva = await enviar("dex-reservar", { id: regra.id, revisao: regra.revisao, categoria: escolha.tipo, token: crypto.randomUUID() }, nome);
@@ -311,7 +311,7 @@ function criarPokedexAutomatica(campo, { treinador, normalizar, podeInteragir })
       if (dono === nome) { regras = regras.map(item => item.id === reserva.id ? reserva : item); mostrarRegras(); }
       const atual = (await enviar("dex-listar", {}, nome)).find(item => item.id === regra.id);
       if (treinador() !== nome || inicio !== interacoes || document.hidden || !document.hasFocus() ||
-          !atual?.ativa || atual.pendente?.token !== reserva.pendente.token || !atual.tipos.includes(escolha.tipo) ||
+          !atual?.ativa || atual.pendente?.token !== reserva.pendente.token || atual.tipos.length !== 1 || !atual.tipos.includes(escolha.tipo) ||
           document.querySelector("dialog[open], #connection-screen:not([hidden])") || lerDetalhe(regra.id)?.detalhe !== antes.detalhe ||
           escolha.botao.matches(":disabled, [aria-disabled='true']") || !escolha.botao.isConnected) return;
       escolha.botao.click();

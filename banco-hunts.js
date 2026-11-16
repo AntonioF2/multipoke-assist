@@ -182,8 +182,19 @@ function configurarPokedex(mensagem) {
       (acao !== "dex-listar" && (typeof id !== "string" || !/^[1-9]\d{0,5}$/.test(id)))) {
     throw new Error("Treinador ou espécie inválidos.");
   }
-  if (acao === "dex-listar") return transacaoHunts(["pokedex"], "readonly", transacao =>
-    pedidoHunts(transacao.objectStore("pokedex").index("treinador").getAll(treinador)));
+  if (acao === "dex-listar") return transacaoHunts(["pokedex"], "readwrite", async transacao => {
+    const loja = transacao.objectStore("pokedex");
+    const regras = await pedidoHunts(loja.index("treinador").getAll(treinador));
+    for (const [indice, regra] of regras.entries()) {
+      if (!Array.isArray(regra.tipos) || regra.tipos.length <= 1) continue;
+      // Não escolhe um destino de pontos pelo jogador ao migrar a seleção antiga.
+      const atual = { ...regra, tipos: [], ativa: false, revisao: (regra.revisao ?? 0) + 1,
+        aviso: "Escolha apenas uma melhoria e ative novamente este Pokémon." };
+      await pedidoHunts(loja.put(atual));
+      regras[indice] = atual;
+    }
+    return regras;
+  });
   return transacaoHunts(["pokedex"], "readwrite", async transacao => {
     const loja = transacao.objectStore("pokedex");
     const anterior = await pedidoHunts(loja.get([treinador, id]));
@@ -219,7 +230,7 @@ function configurarPokedex(mensagem) {
     if (acao === "dex-configurar") {
       const { nome, tipos, ativa, revisao } = mensagem;
       if (typeof nome !== "string" || !nome || nome.length > 120 || typeof ativa !== "boolean" ||
-          !Array.isArray(tipos) || tipos.length > 3 || new Set(tipos).size !== tipos.length ||
+          !Array.isArray(tipos) || tipos.length > 1 || new Set(tipos).size !== tipos.length ||
           tipos.some(tipo => !["capture", "loot", "shiny"].includes(tipo)) || (ativa && !tipos.length)) {
         throw new Error("Configuração da Pokédex inválida.");
       }
@@ -228,6 +239,7 @@ function configurarPokedex(mensagem) {
       regra = { ...anterior, treinador, id, nome, tipos, ativa, aviso: anterior?.pendente ? "Confirmando a última melhoria." : "" };
     } else if (acao === "dex-reservar") {
       if (!anterior?.ativa || anterior.pendente || anterior.revisao !== mensagem.revisao ||
+          !Array.isArray(anterior.tipos) || anterior.tipos.length !== 1 ||
           !anterior.tipos.includes(mensagem.categoria) || typeof mensagem.token !== "string" || mensagem.token.length > 80) return null;
       regra = { ...anterior, pendente: { token: mensagem.token, data: Date.now() }, aviso: "Confirmando melhoria no jogo." };
     } else if (acao === "dex-finalizar") {

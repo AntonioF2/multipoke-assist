@@ -546,11 +546,11 @@
       </section>
       <section id="aba-pokedex" aria-labelledby="abrir-pokedex" hidden>
         <div class="dex-apresentacao">${icone("dex")}<span>PROGRESSÃO · POR ESPÉCIE</span>
-          <h3>Domínio da Pokédex</h3><p>Escolha seus Pokémon e autorize os bônus que deseja melhorar.</p></div>
+          <h3>Domínio da Pokédex</h3><p>Escolha seus Pokémon e um bônus para melhorar em cada espécie.</p></div>
         <small id="dex-treinador">Aguardando um treinador.</small>
         <input id="dex-busca" type="search" placeholder="Buscar Pokémon por nome ou número" aria-label="Buscar Pokémon para melhoria automática" autocomplete="off">
         <div id="dex-resultados" aria-label="Resultados da busca"></div>
-        <p><small>Use os Pontos Dex da espécie em melhorias permanentes. Marque os bônus e ative o Pokémon. Com vários marcados, priorizamos o menos melhorado. Editar as opções desativa a automação até uma nova ativação.</small></p>
+        <p><small>Use os Pontos Dex da espécie em melhorias permanentes. Marque apenas um bônus e ative o Pokémon. Marcar outro substitui o anterior. Editar a opção desativa a automação até uma nova ativação.</small></p>
         <p id="dex-status" role="status">Nenhum Pokémon é ativado por padrão.</p>
         <div id="dex-regras"></div>
       </section>
