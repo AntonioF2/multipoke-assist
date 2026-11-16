@@ -4,12 +4,13 @@
   globalThis.multiPokeObjetosLoja = true;
   const esquemas = {
     treinador: ["name", "pokedollars", "gold"],
+    identidade: ["trainerName"],
     produto: ["id", "name", "kind", "quantity", "priceGold", "buyGold", "shopGoldEnabled"],
     pokemon: ["id", "quality", "ivTotal", "saleValue", "starter", "locked", "shiny", "holo", "reserved", "breedingBox"],
     equipe: ["id"],
     loot: ["id", "itemId", "name", "quantity", "npcPrice", "evolutionStone", "shopBoost", "breedingPheromone"],
   };
-  const raizes = { trainer: "treinador", balls: "produto", supplies: "produto", inventory: "loot", collection: "pokemon", team: "equipe" };
+  const raizes = { trainer: "treinador", online: "identidade", balls: "produto", supplies: "produto", inventory: "loot", collection: "pokemon", team: "equipe" };
   const listas = new Set(["balls", "supplies", "inventory", "collection", "team"]);
   const proibidas = new Set(["__proto__", "constructor", "prototype"]);
   const tipos = new Set(["buy-ball", "buy-supply", "sell-loot-bulk", "sell-pokemon-bulk"]);
@@ -30,13 +31,21 @@
   }
 
   function projetar(raiz, valor) {
+    if (raiz === "online" && valor === null) return {};
     if (!listas.has(raiz)) return registro(valor, raizes[raiz]);
     if (!Array.isArray(valor) || valor.length > 100_000) throw new Error("Lista inválida.");
     return valor.map(item => registro(item, raizes[raiz]));
   }
 
   function publicar(forcar = false) {
-    const dados = estado && { ...estado, conectada: atual?.readyState === WebSocket.OPEN };
+    let dados = null;
+    if (estado) {
+      const { online, ...campos } = estado;
+      // A interface do jogo prioriza a identidade online sobre o nome legado.
+      // Normaliza só a projeção publicada, preservando a base dos próximos deltas.
+      dados = { ...campos, trainer: { ...estado.trainer, name: online?.trainerName || estado.trainer?.name },
+        conectada: atual?.readyState === WebSocket.OPEN };
+    }
     const json = JSON.stringify(dados);
     if (forcar || json !== publicado) {
       publicado = json;

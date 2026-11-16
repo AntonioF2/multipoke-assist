@@ -70,6 +70,70 @@ test("observa snapshots, deltas e somente os campos necessários à loja", () =>
   assert.equal(a.leituras.at(-1).conectada, true);
 });
 
+test("a loja reconhece o treinador online e preenche os suprimentos sem trainer.name", () => {
+  const a = ambiente();
+  const contexto = vm.createContext({ document: a.document, Event, treinador: () => "Ash",
+    inteiro: (n, min, max) => Number.isSafeInteger(n) && n >= min && n <= max });
+  // Exercita o mesmo recebimento e a mesma validação usados pelo painel isolado.
+  vm.runInContext(trecho("  let estadoLoja = null;", "  let estoqueLoot"), contexto);
+  vm.runInContext(trecho('  document.addEventListener("multipoke:objetos-loja",', "  function publicarReposicao("), contexto);
+  vm.runInContext(trecho("  function produto(", "  function pilha("), contexto);
+  const online = estado();
+  delete online.trainer.name;
+  online.online = { trainerName: "Ash", accountId: "nao-copiar", trainerId: "nao-copiar" };
+  online.supplies.push({ id: 4, name: "Revive", kind: "revive", buyGold: 200, quantity: 2 });
+  a.socket.receber({ type: "snapshot", wireSeq: 1, state: online });
+  assert.equal(a.leituras.at(-1).trainer.name, "Ash");
+  assert.equal(a.leituras.at(-1).online, undefined);
+  assert.equal(contexto.produto({ dataset: { shopRow: "ball:1" } })?.tipo, "bola");
+  assert.equal(contexto.produto({ dataset: { shopRow: "supply:2" } })?.tipo, "pocao");
+  assert.equal(contexto.produto({ dataset: { shopRow: "supply:4" } })?.tipo, "revive");
+  const tipos = ["bola", "pocao", "revive"];
+  const seletores = Object.fromEntries(tipos.map(tipo => [tipo, {
+    options: [{ value: "", text: "Sem reposição" }], value: "",
+    get length() { return this.options.length; }, set length(valor) { this.options.length = valor; },
+    add(opcao) { this.options.push(opcao); },
+  }]));
+  const linhas = ["ball:1", "supply:2", "supply:4"].map(shopRow => ({ dataset: { shopRow } }));
+  Object.assign(contexto, { tiposCompra: tipos, escolhasCompra: new Map([["bola", "ball:1"], ["pocao", "supply:2"], ["revive", "supply:4"]]),
+    interfaceLoja: {}, loja: () => ({ querySelectorAll: () => linhas, querySelector: () => null }),
+    campo: id => seletores[id] ?? {}, formatar: valor => valor.toLocaleString("pt-BR"),
+    escrever: (no, mensagem) => { no.textContent = mensagem; },
+    Option: class { constructor(text, value) { this.text = text; this.value = value; } } });
+  vm.runInContext(trecho("  const saldo =", "  const treinador ="), contexto);
+  vm.runInContext(trecho("  function mostrarEstoque()", "  function atualizarRotuloLoot("), contexto);
+  contexto.mostrarEstoque();
+  for (const [tipo, id] of [["bola", "ball:1"], ["pocao", "supply:2"], ["revive", "supply:4"]]) {
+    assert.equal(seletores[tipo].options.length, 2, `${tipo}: inclui a opção de reposição`);
+    assert.equal(seletores[tipo].options[1].value, id);
+    assert.equal(seletores[tipo].value, id, "recupera a escolha salva");
+    assert.match(seletores[tipo].options[1].text, /na mochila/);
+  }
+  a.socket.receber({ type: "snapshot-delta", baseWireSeq: 1, wireSeq: 2,
+    changes: [[["online", "trainerName"], "Misty"]] });
+  assert.equal(a.leituras.at(-1).trainer.name, "Misty");
+  assert.equal(contexto.produto({ dataset: { shopRow: "ball:1" } }), null, "mantém a proteção contra mudança de treinador");
+  contexto.mostrarEstoque();
+  assert.ok(tipos.every(tipo => seletores[tipo].options.length === 1));
+});
+
+test("o nome online tem a mesma prioridade do jogo e a remoção recupera o nome legado", () => {
+  const a = ambiente();
+  const online = estado();
+  online.trainer.name = "Treinador";
+  online.online.trainerName = "Ash";
+  a.socket.receber({ type: "snapshot", wireSeq: 1, state: online });
+  assert.equal(a.leituras.at(-1).trainer.name, "Ash");
+  a.socket.receber({ type: "snapshot-delta", baseWireSeq: 1, wireSeq: 2, changes: [[["online", "trainerName"]]] });
+  assert.equal(a.leituras.at(-1).trainer.name, "Treinador");
+  a.socket.receber({ type: "snapshot-delta", baseWireSeq: 2, wireSeq: 3,
+    changes: [[["online"], { trainerName: "Misty", accountId: "nao-copiar" }]] });
+  assert.equal(a.leituras.at(-1).trainer.name, "Misty");
+  assert.equal(a.leituras.at(-1).online, undefined);
+  a.socket.receber({ type: "snapshot", wireSeq: 4, state: estado() });
+  assert.equal(a.leituras.at(-1).trainer.name, "Ash");
+});
+
 test("acompanha Pokémon por revisão, remoção, ordem e reconexão", () => {
   const a = ambiente();
   const inicial = estado(); delete inicial.collection;
